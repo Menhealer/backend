@@ -1,0 +1,460 @@
+package com.relog.relog.settlement.service;
+
+import com.relog.relog.event.entity.Event;
+import com.relog.relog.event.entity.ReviewScore;
+import com.relog.relog.event.repository.EventRepository;
+import com.relog.relog.friend.entity.Friend;
+import com.relog.relog.friend.repository.FriendRepository;
+import com.relog.relog.gift.entity.Gift;
+import com.relog.relog.gift.entity.GiftDirection;
+import com.relog.relog.gift.repository.GiftRepository;
+import com.relog.relog.settlement.dto.MonthlySettlementResponse;
+import com.relog.relog.settlement.dto.MonthlySettlementResponse.RelationshipSolutionResponse;
+import com.relog.relog.settlement.dto.MonthlySettlementResponse.SummaryResponse;
+import com.relog.relog.settlement.dto.MonthlySettlementResponse.TopFriendResponse;
+import com.relog.relog.settlement.dto.QuarterlySettlementResponse;
+import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendMaintenanceResponse;
+import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendRankResponse;
+import com.relog.relog.settlement.dto.QuarterlySettlementResponse.QuarterlySolutionResponse;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class SettlementService {
+
+    private final EventRepository eventRepository;
+    private final GiftRepository giftRepository;
+    private final FriendRepository friendRepository;
+
+    private static final int POSITIVE_THRESHOLD = 4;
+    private static final int NEGATIVE_THRESHOLD = 2;
+    private static final int MAINTAIN_DAYS_MIN = 30;
+    private static final int ATTENTION_DAYS_MIN = 90;
+
+    public MonthlySettlementResponse getMonthlySettlement(Long memberId, int year, int month) {
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+
+        List<Event> events = eventRepository.findAllByMemberIdAndEventDateBetween(memberId, startDate, endDate);
+        List<Gift> gifts = giftRepository.findAllByMemberIdAndGiftDateBetween(memberId, startDate, endDate);
+
+        return MonthlySettlementResponse.builder()
+                .year(year)
+                .month(month)
+                .summary(calculateSummary(events, gifts))
+                .topFriend(findTopFriend(events))
+                .solution(generateMonthlySolution(events, findTopFriend(events)))
+                .build();
+    }
+
+    public QuarterlySettlementResponse getQuarterlySettlement(Long memberId, int year, int quarter) {
+        LocalDate startDate = LocalDate.of(year, (quarter - 1) * 3 + 1, 1);
+        LocalDate endDate = startDate.plusMonths(3).minusDays(1);
+
+        List<Event> events = eventRepository.findAllByMemberIdAndEventDateBetween(memberId, startDate, endDate);
+        List<Friend> allFriends = friendRepository.findAllByMemberId(memberId);
+
+        List<FriendRankResponse> bestFriends = findBestFriends(events, 5);
+        List<FriendRankResponse> worstFriends = findWorstFriends(events, 5);
+
+        return QuarterlySettlementResponse.builder()
+                .year(year)
+                .quarter(quarter)
+                .bestFriends(bestFriends)
+                .worstFriends(worstFriends)
+                .friendsToMaintain(findFriendsToMaintain(allFriends, events))
+                .friendsNeedingAttention(findFriendsNeedingAttention(allFriends, events))
+                .solution(generateQuarterlySolution(events, bestFriends, worstFriends))
+                .build();
+    }
+
+    private SummaryResponse calculateSummary(List<Event> events, List<Gift> gifts) {
+        int positiveMeetings = 0;
+        int negativeMeetings = 0;
+        int totalScore = 0;
+        int scoredCount = 0;
+
+        for (Event event : events) {
+            if (event.getReviewScore() == null) {
+                continue;
+            }
+            int score = event.getReviewScore().getScore();
+            totalScore += score;
+            scoredCount++;
+            positiveMeetings += countIfPositive(score);
+            negativeMeetings += countIfNegative(score);
+        }
+
+        GiftSummary giftSummary = calculateGiftSummary(gifts);
+
+        return SummaryResponse.builder()
+                .totalMeetings(events.size())
+                .positiveMeetings(positiveMeetings)
+                .negativeMeetings(negativeMeetings)
+                .averageScore(calculateAverage(totalScore, scoredCount))
+                .totalGiftsGiven(giftSummary.givenCount)
+                .totalGiftsReceived(giftSummary.receivedCount)
+                .totalAmountGiven(giftSummary.givenAmount)
+                .totalAmountReceived(giftSummary.receivedAmount)
+                .build();
+    }
+
+    private GiftSummary calculateGiftSummary(List<Gift> gifts) {
+        int givenCount = 0;
+        int receivedCount = 0;
+        long givenAmount = 0;
+        long receivedAmount = 0;
+
+        for (Gift gift : gifts) {
+            int price = gift.getPrice() != null ? gift.getPrice() : 0;
+            
+            if (gift.getDirection() == GiftDirection.GIVEN) {
+                givenCount++;
+                givenAmount += price;
+                continue;
+            }
+            receivedCount++;
+            receivedAmount += price;
+        }
+
+        return new GiftSummary(givenCount, receivedCount, givenAmount, receivedAmount);
+    }
+
+    private TopFriendResponse findTopFriend(List<Event> events) {
+        if (events.isEmpty()) {
+            return null;
+        }
+
+        Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
+        Map.Entry<Long, List<Event>> topEntry = findTopEntry(eventsByFriend);
+
+        if (topEntry == null) {
+            return null;
+        }
+
+        List<Event> topFriendEvents = topEntry.getValue();
+        Friend topFriend = topFriendEvents.get(0).getFriend();
+
+        return TopFriendResponse.builder()
+                .friendId(topEntry.getKey())
+                .friendName(topFriend.getName())
+                .meetingCount(topFriendEvents.size())
+                .averageScore(calculateAverageScore(topFriendEvents))
+                .build();
+    }
+
+    private Map.Entry<Long, List<Event>> findTopEntry(Map<Long, List<Event>> eventsByFriend) {
+        Map.Entry<Long, List<Event>> topEntry = null;
+        int maxCount = 0;
+
+        for (Map.Entry<Long, List<Event>> entry : eventsByFriend.entrySet()) {
+            if (entry.getValue().size() <= maxCount) {
+                continue;
+            }
+            maxCount = entry.getValue().size();
+            topEntry = entry;
+        }
+
+        return topEntry;
+    }
+
+    private List<FriendRankResponse> findBestFriends(List<Event> events, int limit) {
+        Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
+
+        return eventsByFriend.entrySet().stream()
+                .map(entry -> createFriendRank(entry.getKey(), entry.getValue()))
+                .sorted(Comparator.comparingDouble(FriendRankResponse::getAverageScore).reversed()
+                        .thenComparingInt(FriendRankResponse::getMeetingCount).reversed())
+                .limit(limit)
+                .toList();
+    }
+
+    private List<FriendRankResponse> findWorstFriends(List<Event> events, int limit) {
+        Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
+
+        return eventsByFriend.entrySet().stream()
+                .map(entry -> createFriendRank(entry.getKey(), entry.getValue()))
+                .filter(rank -> rank.getAverageScore() > 0)
+                .sorted(Comparator.comparingDouble(FriendRankResponse::getAverageScore)
+                        .thenComparingInt(FriendRankResponse::getNegativeCount).reversed())
+                .limit(limit)
+                .toList();
+    }
+
+    private List<FriendMaintenanceResponse> findFriendsToMaintain(List<Friend> allFriends, List<Event> events) {
+        Map<Long, LocalDate> lastMeetingByFriend = buildLastMeetingMap(events);
+        LocalDate now = LocalDate.now();
+        List<FriendMaintenanceResponse> result = new ArrayList<>();
+
+        for (Friend friend : allFriends) {
+            LocalDate lastMeeting = lastMeetingByFriend.get(friend.getId());
+            if (lastMeeting == null) {
+                continue;
+            }
+            long daysSince = ChronoUnit.DAYS.between(lastMeeting, now);
+            if (daysSince < MAINTAIN_DAYS_MIN || daysSince >= ATTENTION_DAYS_MIN) {
+                continue;
+            }
+            result.add(createMaintenanceResponse(friend, (int) daysSince, "오랜 기간 유지하면 좋은 관계입니다."));
+        }
+
+        return result;
+    }
+
+    private List<FriendMaintenanceResponse> findFriendsNeedingAttention(List<Friend> allFriends, List<Event> events) {
+        Map<Long, LocalDate> lastMeetingByFriend = buildLastMeetingMap(events);
+        LocalDate now = LocalDate.now();
+        List<FriendMaintenanceResponse> result = new ArrayList<>();
+
+        for (Friend friend : allFriends) {
+            LocalDate lastMeeting = lastMeetingByFriend.get(friend.getId());
+            
+            if (lastMeeting == null) {
+                result.add(createMaintenanceResponse(friend, -1, "만남 기록이 없습니다. 연락해보세요."));
+                continue;
+            }
+            
+            long daysSince = ChronoUnit.DAYS.between(lastMeeting, now);
+            if (daysSince < ATTENTION_DAYS_MIN) {
+                continue;
+            }
+            result.add(createMaintenanceResponse(friend, (int) daysSince, "기간 내로 정리가 필요한 관계입니다."));
+        }
+
+        return result;
+    }
+
+    private Map<Long, LocalDate> buildLastMeetingMap(List<Event> events) {
+        Map<Long, LocalDate> lastMeetingByFriend = new HashMap<>();
+        
+        for (Event event : events) {
+            Long friendId = event.getFriend().getId();
+            LocalDate eventDate = event.getEventDate();
+            lastMeetingByFriend.merge(friendId, eventDate, this::getLaterDate);
+        }
+        
+        return lastMeetingByFriend;
+    }
+
+    private LocalDate getLaterDate(LocalDate a, LocalDate b) {
+        if (a.isAfter(b)) {
+            return a;
+        }
+        return b;
+    }
+
+    private FriendMaintenanceResponse createMaintenanceResponse(Friend friend, int daysSince, String recommendation) {
+        return FriendMaintenanceResponse.builder()
+                .friendId(friend.getId())
+                .friendName(friend.getName())
+                .daysSinceLastMeeting(daysSince)
+                .recommendation(recommendation)
+                .build();
+    }
+
+    private RelationshipSolutionResponse generateMonthlySolution(List<Event> events, TopFriendResponse topFriend) {
+        if (topFriend == null) {
+            return createEmptyMonthlySolution();
+        }
+
+        return createMonthlySolutionByScore(topFriend);
+    }
+
+    private RelationshipSolutionResponse createEmptyMonthlySolution() {
+        return RelationshipSolutionResponse.builder()
+                .friendName(null)
+                .analysis("이번 달 만남 기록이 없습니다.")
+                .suggestions(List.of("친구들과의 만남을 계획해보세요."))
+                .build();
+    }
+
+    private RelationshipSolutionResponse createMonthlySolutionByScore(TopFriendResponse topFriend) {
+        double score = topFriend.getAverageScore();
+        String friendName = topFriend.getFriendName();
+
+        if (score >= 4.0) {
+            return createPositiveSolution(friendName);
+        }
+        if (score >= 3.0) {
+            return createNeutralSolution(friendName);
+        }
+        return createNegativeSolution(friendName);
+    }
+
+    private RelationshipSolutionResponse createPositiveSolution(String friendName) {
+        return RelationshipSolutionResponse.builder()
+                .friendName(friendName)
+                .analysis(friendName + "님과의 관계가 매우 좋습니다.")
+                .suggestions(List.of("이 관계를 계속 유지하세요.", "특별한 날에 선물을 준비해보세요."))
+                .build();
+    }
+
+    private RelationshipSolutionResponse createNeutralSolution(String friendName) {
+        return RelationshipSolutionResponse.builder()
+                .friendName(friendName)
+                .analysis(friendName + "님과의 관계는 보통입니다.")
+                .suggestions(List.of("더 깊은 대화를 나눠보세요.", "함께 새로운 활동을 시도해보세요."))
+                .build();
+    }
+
+    private RelationshipSolutionResponse createNegativeSolution(String friendName) {
+        return RelationshipSolutionResponse.builder()
+                .friendName(friendName)
+                .analysis(friendName + "님과의 관계에 주의가 필요합니다.")
+                .suggestions(List.of("솔직한 대화를 통해 문제를 파악해보세요.", "관계 개선을 위한 노력이 필요합니다."))
+                .build();
+    }
+
+    private QuarterlySolutionResponse generateQuarterlySolution(
+            List<Event> events,
+            List<FriendRankResponse> bestFriends,
+            List<FriendRankResponse> worstFriends) {
+
+        List<String> positiveInsights = buildPositiveInsights(bestFriends);
+        List<String> negativeInsights = buildNegativeInsights(worstFriends);
+        List<String> actionItems = buildActionItems(events, worstFriends);
+        String overallAnalysis = buildOverallAnalysis(events.size());
+
+        return QuarterlySolutionResponse.builder()
+                .overallAnalysis(overallAnalysis)
+                .positiveInsights(positiveInsights)
+                .negativeInsights(negativeInsights)
+                .actionItems(actionItems)
+                .build();
+    }
+
+    private String buildOverallAnalysis(int totalMeetings) {
+        if (totalMeetings == 0) {
+            return "이번 분기 만남 기록이 없습니다.";
+        }
+        if (totalMeetings < 5) {
+            return "이번 분기 만남이 적은 편입니다.";
+        }
+        return "이번 분기 활발한 교류가 있었습니다.";
+    }
+
+    private List<String> buildPositiveInsights(List<FriendRankResponse> bestFriends) {
+        List<String> insights = new ArrayList<>();
+        
+        for (FriendRankResponse best : bestFriends) {
+            if (best.getAverageScore() < 4.0) {
+                continue;
+            }
+            insights.add(best.getFriendName() + "님과 좋은 관계를 유지하고 있습니다.");
+        }
+        
+        return insights;
+    }
+
+    private List<String> buildNegativeInsights(List<FriendRankResponse> worstFriends) {
+        List<String> insights = new ArrayList<>();
+        
+        for (FriendRankResponse worst : worstFriends) {
+            if (worst.getAverageScore() >= 3.0 || worst.getAverageScore() <= 0) {
+                continue;
+            }
+            insights.add(worst.getFriendName() + "님과의 관계 개선이 필요합니다.");
+        }
+        
+        return insights;
+    }
+
+    private List<String> buildActionItems(List<Event> events, List<FriendRankResponse> worstFriends) {
+        List<String> actionItems = new ArrayList<>();
+
+        if (events.isEmpty()) {
+            actionItems.add("친구들과의 만남을 계획해보세요.");
+        }
+
+        for (FriendRankResponse worst : worstFriends) {
+            if (worst.getAverageScore() >= 3.0 || worst.getAverageScore() <= 0) {
+                continue;
+            }
+            actionItems.add(worst.getFriendName() + "님과 솔직한 대화를 나눠보세요.");
+        }
+
+        return actionItems;
+    }
+
+    private Map<Long, List<Event>> groupEventsByFriend(List<Event> events) {
+        Map<Long, List<Event>> result = new HashMap<>();
+        
+        for (Event event : events) {
+            result.computeIfAbsent(event.getFriend().getId(), k -> new ArrayList<>()).add(event);
+        }
+        
+        return result;
+    }
+
+    private FriendRankResponse createFriendRank(Long friendId, List<Event> events) {
+        Friend friend = events.get(0).getFriend();
+        int positiveCount = 0;
+        int negativeCount = 0;
+
+        for (Event event : events) {
+            if (event.getReviewScore() == null) {
+                continue;
+            }
+            int score = event.getReviewScore().getScore();
+            positiveCount += countIfPositive(score);
+            negativeCount += countIfNegative(score);
+        }
+
+        return FriendRankResponse.builder()
+                .friendId(friendId)
+                .friendName(friend.getName())
+                .meetingCount(events.size())
+                .averageScore(calculateAverageScore(events))
+                .positiveCount(positiveCount)
+                .negativeCount(negativeCount)
+                .build();
+    }
+
+    private double calculateAverageScore(List<Event> events) {
+        int totalScore = 0;
+        int count = 0;
+
+        for (Event event : events) {
+            if (event.getReviewScore() == null) {
+                continue;
+            }
+            totalScore += event.getReviewScore().getScore();
+            count++;
+        }
+
+        return calculateAverage(totalScore, count);
+    }
+
+    private int countIfPositive(int score) {
+        if (score >= POSITIVE_THRESHOLD) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private int countIfNegative(int score) {
+        if (score <= NEGATIVE_THRESHOLD) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private double calculateAverage(int total, int count) {
+        if (count == 0) {
+            return 0.0;
+        }
+        return (double) total / count;
+    }
+
+    private record GiftSummary(int givenCount, int receivedCount, long givenAmount, long receivedAmount) {}
+}
