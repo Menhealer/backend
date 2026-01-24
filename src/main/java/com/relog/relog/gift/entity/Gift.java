@@ -54,6 +54,9 @@ public class Gift extends BaseEntity {
     @Column(name = "direction", nullable = false)
     private GiftDirection direction;
 
+    @Column(name = "description", length = 500)
+    private String description;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private RelogMember member;
@@ -80,5 +83,9 @@ public class Gift extends BaseEntity {
 
     public void updateDirection(GiftDirection direction) {
         this.direction = direction;
+    }
+
+    public void updateDescription(String description) {
+        this.description = description;
     }
 }

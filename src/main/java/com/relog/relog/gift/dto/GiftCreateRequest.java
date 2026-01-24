@@ -6,24 +6,28 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
+@NoArgsConstructor
 public class GiftCreateRequest {
 
-    @NotBlank
+    @NotBlank(message = "선물 이름은 필수입니다.")
     private String itemName;
 
     private Integer price;
 
-    @NotNull
+    @NotNull(message = "선물 날짜는 필수입니다.")
     private LocalDate giftDate;
 
-    @NotNull
+    @NotNull(message = "선물 유형은 필수입니다.")
     private GiftType giftType;
 
-    @NotNull
+    @NotNull(message = "선물 방향은 필수입니다.")
     private GiftDirection direction;
 
-    @NotNull
+    private String description;
+
+    @NotNull(message = "친구 ID는 필수입니다.")
     private Long friendId;
 }

@@ -39,6 +39,7 @@ public class GiftService {
                 .giftDate(request.getGiftDate())
                 .giftType(request.getGiftType())
                 .direction(request.getDirection())
+                .description(request.getDescription())
                 .member(member)
                 .friend(friend)
                 .build();
@@ -79,6 +80,7 @@ public class GiftService {
         updateGiftDate(gift, request.getGiftDate());
         updateGiftType(gift, request.getGiftType());
         updateDirection(gift, request.getDirection());
+        updateDescription(gift, request.getDescription());
 
         return GiftResponse.from(gift);
     }
@@ -137,5 +139,12 @@ public class GiftService {
             return;
         }
         gift.updateDirection(direction);
+    }
+
+    private void updateDescription(Gift gift, String description) {
+        if (description == null) {
+            return;
+        }
+        gift.updateDescription(description);
     }
 }

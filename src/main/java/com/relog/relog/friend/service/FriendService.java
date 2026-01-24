@@ -11,6 +11,7 @@ import com.relog.relog.friend.dto.FriendDetailResponse.RelationshipScoreResponse
 import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.friend.dto.FriendUpdateRequest;
 import com.relog.relog.friend.entity.Friend;
+import com.relog.relog.friend.exception.FriendNameDuplicateException;
 import com.relog.relog.friend.exception.FriendNotFoundException;
 import com.relog.relog.friend.repository.FriendRepository;
 import com.relog.relog.friendgroup.entity.FriendGroup;
@@ -21,6 +22,7 @@ import com.relog.relog.gift.repository.GiftRepository;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class FriendService {
     @Transactional
     public FriendResponse createFriend(Long memberId, FriendCreateRequest request) {
         RelogMember member = findMemberById(memberId);
+        validateFriendNameNotDuplicate(memberId, request.getName());
         FriendGroup friendGroup = findFriendGroupIfExists(request.getGroupId(), memberId);
 
         Friend friend = Friend.builder()
@@ -77,11 +80,15 @@ public class FriendService {
                 .build();
     }
 
+    public boolean isNameDuplicate(Long memberId, String name) {
+        return friendRepository.existsByMemberIdAndName(memberId, name);
+    }
+
     @Transactional
     public FriendResponse updateFriend(Long memberId, Long friendId, FriendUpdateRequest request) {
         Friend friend = findFriendByIdAndMemberId(friendId, memberId);
 
-        updateFriendName(friend, request.getName());
+        updateFriendName(friend, request.getName(), memberId);
         updateFriendBirthday(friend, request.getBirthday());
         updateFriendGroup(friend, request.getGroupId(), memberId);
 
@@ -112,14 +119,24 @@ public class FriendService {
                 .orElseThrow(FriendGroupNotFoundException::new);
     }
 
-    private void updateFriendName(Friend friend, String name) {
+    private void validateFriendNameNotDuplicate(Long memberId, String name) {
+        if (friendRepository.existsByMemberIdAndName(memberId, name)) {
+            throw new FriendNameDuplicateException();
+        }
+    }
+
+    private void updateFriendName(Friend friend, String name, Long memberId) {
         if (name == null) {
             return;
         }
+        if (name.equals(friend.getName())) {
+            return;
+        }
+        validateFriendNameNotDuplicate(memberId, name);
         friend.updateName(name);
     }
 
-    private void updateFriendBirthday(Friend friend, java.time.LocalDate birthday) {
+    private void updateFriendBirthday(Friend friend, LocalDate birthday) {
         if (birthday == null) {
             return;
         }

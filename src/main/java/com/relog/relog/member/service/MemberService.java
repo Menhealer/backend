@@ -27,6 +27,7 @@ public class MemberService {
 
         updateNickname(member, request.getNickname());
         updateBirthday(member, request.getBirthday());
+        updateProfileImage(member, request.getProfileImage());
 
         return MemberResponse.from(member);
     }
@@ -54,5 +55,12 @@ public class MemberService {
             return;
         }
         member.updateBirthday(birthday);
+    }
+
+    private void updateProfileImage(RelogMember member, String profileImage) {
+        if (profileImage == null) {
+            return;
+        }
+        member.updateProfileImage(profileImage);
     }
 }

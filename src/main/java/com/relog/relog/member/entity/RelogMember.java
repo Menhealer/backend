@@ -39,8 +39,11 @@ public class RelogMember extends BaseEntity {
     @Column(name = "nickname", length = 20, nullable = false)
     private String nickname;
 
-    @Column(name = "birthday", nullable = false)
+    @Column(name = "birthday")
     private LocalDate birthday;
+
+    @Column(name = "profile_image", length = 500)
+    private String profileImage;
 
     public void updatePassword(String encodedPassword) {
         this.password = encodedPassword;
@@ -52,5 +55,9 @@ public class RelogMember extends BaseEntity {
 
     public void updateBirthday(LocalDate birthday) {
         this.birthday = birthday;
+    }
+
+    public void updateProfileImage(String profileImage) {
+        this.profileImage = profileImage;
     }
 }

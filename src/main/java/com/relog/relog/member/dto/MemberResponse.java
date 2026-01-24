@@ -15,6 +15,7 @@ public class MemberResponse {
     private String email;
     private String nickname;
     private LocalDate birthday;
+    private String profileImage;
 
     public static MemberResponse from(RelogMember member) {
         return MemberResponse.builder()
@@ -22,6 +23,7 @@ public class MemberResponse {
                 .email(member.getEmail())
                 .nickname(member.getNickname())
                 .birthday(member.getBirthday())
+                .profileImage(member.getProfileImage())
                 .build();
     }
 }

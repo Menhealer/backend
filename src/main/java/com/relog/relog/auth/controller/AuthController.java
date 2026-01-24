@@ -1,5 +1,7 @@
 package com.relog.relog.auth.controller;
 
+import com.relog.relog.auth.dto.EmailCheckRequest;
+import com.relog.relog.auth.dto.EmailCheckResponse;
 import com.relog.relog.auth.dto.LoginRequest;
 import com.relog.relog.auth.dto.PasswordChangeRequest;
 import com.relog.relog.auth.dto.SignUpRequest;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -33,6 +35,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse response = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/email-check")
+    public ResponseEntity<ApiResponse<EmailCheckResponse>> checkEmail(@Valid @RequestBody EmailCheckRequest request) {
+        boolean isDuplicate = authService.checkEmailDuplicate(request.getEmail());
+        EmailCheckResponse response = new EmailCheckResponse(isDuplicate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

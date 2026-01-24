@@ -18,6 +18,8 @@ public interface FriendRepository extends JpaRepository<Friend, Long> {
 
     List<Friend> findAllByMemberIdAndFriendGroupId(Long memberId, Long groupId);
 
+    boolean existsByMemberIdAndName(Long memberId, String name);
+
     @Query("SELECT f FROM Friend f WHERE f.member.id = :memberId AND " +
            "MONTH(f.birthday) = :month AND DAY(f.birthday) = :day")
     List<Friend> findByMemberIdAndBirthdayMonthAndDay(

@@ -19,6 +19,7 @@ public class GiftResponse {
     private LocalDate giftDate;
     private GiftType giftType;
     private GiftDirection direction;
+    private String description;
     private Long friendId;
     private String friendName;
 
@@ -30,6 +31,7 @@ public class GiftResponse {
                 .giftDate(gift.getGiftDate())
                 .giftType(gift.getGiftType())
                 .direction(gift.getDirection())
+                .description(gift.getDescription())
                 .friendId(gift.getFriend().getId())
                 .friendName(gift.getFriend().getName())
                 .build();

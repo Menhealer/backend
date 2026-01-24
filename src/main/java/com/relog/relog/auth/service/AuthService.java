@@ -50,6 +50,10 @@ public class AuthService {
         return createTokenResponse(member.getId());
     }
 
+    public boolean checkEmailDuplicate(String email) {
+        return memberRepository.existsByEmail(email);
+    }
+
     @Transactional
     public void changePassword(Long memberId, PasswordChangeRequest request) {
         RelogMember member = memberRepository.findById(memberId)

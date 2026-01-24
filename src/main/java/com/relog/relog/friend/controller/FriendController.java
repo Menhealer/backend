@@ -3,6 +3,8 @@ package com.relog.relog.friend.controller;
 import com.relog.relog.common.ApiResponse;
 import com.relog.relog.friend.dto.FriendCreateRequest;
 import com.relog.relog.friend.dto.FriendDetailResponse;
+import com.relog.relog.friend.dto.FriendNameCheckRequest;
+import com.relog.relog.friend.dto.FriendNameCheckResponse;
 import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.friend.dto.FriendUpdateRequest;
 import com.relog.relog.friend.service.FriendService;
@@ -23,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/friends")
+@RequestMapping("/friends")
 @RequiredArgsConstructor
 public class FriendController {
 
@@ -50,6 +52,15 @@ public class FriendController {
             @AuthenticationPrincipal Long memberId,
             @PathVariable Long friendId) {
         FriendDetailResponse response = friendService.getFriendDetail(memberId, friendId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/name-check")
+    public ResponseEntity<ApiResponse<FriendNameCheckResponse>> checkName(
+            @AuthenticationPrincipal Long memberId,
+            @Valid @RequestBody FriendNameCheckRequest request) {
+        boolean isDuplicate = friendService.isNameDuplicate(memberId, request.getName());
+        FriendNameCheckResponse response = new FriendNameCheckResponse(isDuplicate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
