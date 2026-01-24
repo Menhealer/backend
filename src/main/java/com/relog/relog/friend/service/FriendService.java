@@ -56,21 +56,21 @@ public class FriendService {
     }
 
     public List<FriendResponse> getAllFriends(Long memberId) {
-        return friendRepository.findAllByMemberId(memberId).stream()
+        return friendRepository.findAllWithGroupByMemberId(memberId).stream()
                 .map(FriendResponse::from)
                 .toList();
     }
 
     public List<FriendResponse> getFriendsByGroup(Long memberId, Long groupId) {
-        return friendRepository.findAllByMemberIdAndFriendGroupId(memberId, groupId).stream()
+        return friendRepository.findAllWithGroupByMemberIdAndGroupId(memberId, groupId).stream()
                 .map(FriendResponse::from)
                 .toList();
     }
 
     public FriendDetailResponse getFriendDetail(Long memberId, Long friendId) {
-        Friend friend = findFriendByIdAndMemberId(friendId, memberId);
-        List<Event> events = eventRepository.findAllByMemberIdAndFriendId(memberId, friendId);
-        List<Gift> gifts = giftRepository.findAllByMemberIdAndFriendId(memberId, friendId);
+        Friend friend = findFriendByIdAndMemberIdWithGroup(friendId, memberId);
+        List<Event> events = eventRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
+        List<Gift> gifts = giftRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
 
         return FriendDetailResponse.builder()
                 .friend(FriendResponse.from(friend))
@@ -108,6 +108,11 @@ public class FriendService {
 
     private Friend findFriendByIdAndMemberId(Long friendId, Long memberId) {
         return friendRepository.findByIdAndMemberId(friendId, memberId)
+                .orElseThrow(FriendNotFoundException::new);
+    }
+
+    private Friend findFriendByIdAndMemberIdWithGroup(Long friendId, Long memberId) {
+        return friendRepository.findByIdAndMemberIdWithGroup(friendId, memberId)
                 .orElseThrow(FriendNotFoundException::new);
     }
 

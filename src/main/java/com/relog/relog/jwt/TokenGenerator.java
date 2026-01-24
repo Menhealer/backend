@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 public class TokenGenerator {
 
     private final JwtUtil jwtUtil;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Value("${jwt.access-token-expiration}")
     private Long accessTokenExpiration;
@@ -25,6 +26,28 @@ public class TokenGenerator {
 
     public String generateRefreshToken(Long memberId) {
         Date expiredTime = new Date(System.currentTimeMillis() + refreshTokenExpiration);
-        return jwtUtil.issue(expiredTime, memberId, List.of("ROLE_USER"), JwtType.REFRESH);
+        String refreshToken = jwtUtil.issue(expiredTime, memberId, List.of("ROLE_USER"), JwtType.REFRESH);
+        refreshTokenRepository.save(memberId, refreshToken);
+        return refreshToken;
+    }
+
+    public String rotateRefreshToken(Long memberId, String oldRefreshToken) {
+        String storedToken = refreshTokenRepository.findByMemberId(memberId);
+        if (storedToken == null || !storedToken.equals(oldRefreshToken)) {
+            return null;
+        }
+        return generateRefreshToken(memberId);
+    }
+
+    public void invalidateRefreshToken(Long memberId) {
+        refreshTokenRepository.delete(memberId);
+    }
+
+    public boolean isRefreshTokenValid(Long memberId, String refreshToken) {
+        String storedToken = refreshTokenRepository.findByMemberId(memberId);
+        if (storedToken == null) {
+            return false;
+        }
+        return storedToken.equals(refreshToken);
     }
 }

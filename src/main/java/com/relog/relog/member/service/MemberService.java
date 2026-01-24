@@ -2,12 +2,17 @@ package com.relog.relog.member.service;
 
 import com.relog.relog.member.dto.MemberResponse;
 import com.relog.relog.member.dto.MemberUpdateRequest;
+import com.relog.relog.member.dto.ProfileImageResponse;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
+import com.relog.relog.storage.S3StorageService;
+import java.io.IOException;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MemberService {
 
     private final RelogMemberRepository memberRepository;
+    private final S3StorageService s3StorageService;
 
     public MemberResponse getMember(Long memberId) {
         RelogMember member = findMemberById(memberId);
@@ -27,20 +33,48 @@ public class MemberService {
 
         updateNickname(member, request.getNickname());
         updateBirthday(member, request.getBirthday());
-        updateProfileImage(member, request.getProfileImage());
 
         return MemberResponse.from(member);
     }
 
     @Transactional
+    public ProfileImageResponse uploadProfileImage(Long memberId, MultipartFile file) throws IOException {
+        RelogMember member = findMemberById(memberId);
+
+        deleteExistingProfileImage(member);
+
+        String imageUrl = s3StorageService.uploadProfileImage(memberId, file);
+        member.updateProfileImage(imageUrl);
+
+        return new ProfileImageResponse(imageUrl);
+    }
+
+    @Transactional
+    public void deleteProfileImage(Long memberId) {
+        RelogMember member = findMemberById(memberId);
+
+        deleteExistingProfileImage(member);
+        member.updateProfileImage(null);
+    }
+
+    @Transactional
     public void deleteMember(Long memberId) {
         RelogMember member = findMemberById(memberId);
+
+        deleteExistingProfileImage(member);
         memberRepository.delete(member);
     }
 
     private RelogMember findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
+    }
+
+    private void deleteExistingProfileImage(RelogMember member) {
+        if (member.getProfileImage() == null) {
+            return;
+        }
+        s3StorageService.deleteProfileImage(member.getProfileImage());
     }
 
     private void updateNickname(RelogMember member, String nickname) {
@@ -50,17 +84,10 @@ public class MemberService {
         member.updateNickname(nickname);
     }
 
-    private void updateBirthday(RelogMember member, java.time.LocalDate birthday) {
+    private void updateBirthday(RelogMember member, LocalDate birthday) {
         if (birthday == null) {
             return;
         }
         member.updateBirthday(birthday);
-    }
-
-    private void updateProfileImage(RelogMember member, String profileImage) {
-        if (profileImage == null) {
-            return;
-        }
-        member.updateProfileImage(profileImage);
     }
 }

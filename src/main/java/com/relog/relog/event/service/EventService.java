@@ -52,13 +52,13 @@ public class EventService {
     }
 
     public List<EventResponse> getEventsByDate(Long memberId, LocalDate date) {
-        return eventRepository.findAllByMemberIdAndEventDate(memberId, date).stream()
+        return eventRepository.findAllWithFriendByMemberIdAndDate(memberId, date).stream()
                 .map(EventResponse::from)
                 .toList();
     }
 
     public EventResponse getEvent(Long memberId, Long eventId) {
-        Event event = findEventByIdAndMemberId(eventId, memberId);
+        Event event = findEventByIdAndMemberIdWithFriend(eventId, memberId);
         return EventResponse.from(event);
     }
 
@@ -68,7 +68,7 @@ public class EventService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
 
-        List<Event> events = eventRepository.findAllByMemberIdAndEventDateBetween(memberId, startDate, endDate);
+        List<Event> events = eventRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
         List<Friend> friends = friendRepository.findAllByMemberId(memberId);
         Map<LocalDate, List<Event>> eventsByDate = groupEventsByDate(events);
 
@@ -114,6 +114,11 @@ public class EventService {
                 .orElseThrow(EventNotFoundException::new);
     }
 
+    private Event findEventByIdAndMemberIdWithFriend(Long eventId, Long memberId) {
+        return eventRepository.findByIdAndMemberIdWithFriend(eventId, memberId)
+                .orElseThrow(EventNotFoundException::new);
+    }
+
     private Map<LocalDate, List<Event>> groupEventsByDate(List<Event> events) {
         return events.stream()
                 .collect(Collectors.groupingBy(Event::getEventDate));
@@ -124,9 +129,9 @@ public class EventService {
             Map<LocalDate, List<Event>> eventsByDate,
             RelogMember member,
             List<Friend> friends) {
-        
+
         List<CalendarDayResponse> days = new ArrayList<>();
-        
+
         for (int day = 1; day <= yearMonth.lengthOfMonth(); day++) {
             LocalDate date = yearMonth.atDay(day);
             List<EventResponse> dayEvents = getDayEvents(eventsByDate, date);
@@ -138,7 +143,7 @@ public class EventService {
                     .birthdays(birthdays)
                     .build());
         }
-        
+
         return days;
     }
 

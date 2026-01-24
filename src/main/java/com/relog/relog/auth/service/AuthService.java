@@ -7,6 +7,8 @@ import com.relog.relog.auth.dto.TokenResponse;
 import com.relog.relog.auth.exception.EmailAlreadyExistsException;
 import com.relog.relog.auth.exception.InvalidCredentialsException;
 import com.relog.relog.auth.exception.InvalidPasswordException;
+import com.relog.relog.auth.exception.InvalidTokenException;
+import com.relog.relog.jwt.JwtUtil;
 import com.relog.relog.jwt.TokenGenerator;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
@@ -24,6 +26,7 @@ public class AuthService {
     private final RelogMemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenGenerator tokenGenerator;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public TokenResponse signUp(SignUpRequest request) {
@@ -48,6 +51,25 @@ public class AuthService {
         validatePassword(request.getPassword(), member.getPassword());
 
         return createTokenResponse(member.getId());
+    }
+
+    public TokenResponse refresh(String refreshToken) {
+        validateRefreshToken(refreshToken);
+
+        Long memberId = jwtUtil.getMemberId(refreshToken);
+        validateStoredRefreshToken(memberId, refreshToken);
+
+        String newAccessToken = tokenGenerator.generateAccessToken(memberId);
+        String newRefreshToken = tokenGenerator.rotateRefreshToken(memberId, refreshToken);
+
+        return TokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
+    }
+
+    public void logout(Long memberId) {
+        tokenGenerator.invalidateRefreshToken(memberId);
     }
 
     public boolean checkEmailDuplicate(String email) {
@@ -79,6 +101,18 @@ public class AuthService {
     private void validateCurrentPassword(String rawPassword, String encodedPassword) {
         if (!passwordEncoder.matches(rawPassword, encodedPassword)) {
             throw new InvalidPasswordException();
+        }
+    }
+
+    private void validateRefreshToken(String refreshToken) {
+        if (!jwtUtil.validateToken(refreshToken)) {
+            throw new InvalidTokenException();
+        }
+    }
+
+    private void validateStoredRefreshToken(Long memberId, String refreshToken) {
+        if (!tokenGenerator.isRefreshTokenValid(memberId, refreshToken)) {
+            throw new InvalidTokenException();
         }
     }
 

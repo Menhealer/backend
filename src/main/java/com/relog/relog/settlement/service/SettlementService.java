@@ -1,7 +1,9 @@
 package com.relog.relog.settlement.service;
 
+import com.relog.relog.ai.AiAnalysisService;
+import com.relog.relog.ai.dto.MonthlyAnalysisResult;
+import com.relog.relog.ai.dto.QuarterlyAnalysisResult;
 import com.relog.relog.event.entity.Event;
-import com.relog.relog.event.entity.ReviewScore;
 import com.relog.relog.event.repository.EventRepository;
 import com.relog.relog.friend.entity.Friend;
 import com.relog.relog.friend.repository.FriendRepository;
@@ -35,6 +37,7 @@ public class SettlementService {
     private final EventRepository eventRepository;
     private final GiftRepository giftRepository;
     private final FriendRepository friendRepository;
+    private final AiAnalysisService aiAnalysisService;
 
     private static final int POSITIVE_THRESHOLD = 4;
     private static final int NEGATIVE_THRESHOLD = 2;
@@ -45,15 +48,18 @@ public class SettlementService {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
-        List<Event> events = eventRepository.findAllByMemberIdAndEventDateBetween(memberId, startDate, endDate);
-        List<Gift> gifts = giftRepository.findAllByMemberIdAndGiftDateBetween(memberId, startDate, endDate);
+        List<Event> events = eventRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
+        List<Gift> gifts = giftRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
+
+        TopFriendResponse topFriend = findTopFriend(events);
+        MonthlyAnalysisResult aiResult = aiAnalysisService.analyzeMonthly(events, gifts);
 
         return MonthlySettlementResponse.builder()
                 .year(year)
                 .month(month)
                 .summary(calculateSummary(events, gifts))
-                .topFriend(findTopFriend(events))
-                .solution(generateMonthlySolution(events, findTopFriend(events)))
+                .topFriend(topFriend)
+                .solution(toRelationshipSolution(aiResult))
                 .build();
     }
 
@@ -61,11 +67,12 @@ public class SettlementService {
         LocalDate startDate = LocalDate.of(year, (quarter - 1) * 3 + 1, 1);
         LocalDate endDate = startDate.plusMonths(3).minusDays(1);
 
-        List<Event> events = eventRepository.findAllByMemberIdAndEventDateBetween(memberId, startDate, endDate);
+        List<Event> events = eventRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
         List<Friend> allFriends = friendRepository.findAllByMemberId(memberId);
 
         List<FriendRankResponse> bestFriends = findBestFriends(events, 5);
         List<FriendRankResponse> worstFriends = findWorstFriends(events, 5);
+        QuarterlyAnalysisResult aiResult = aiAnalysisService.analyzeQuarterly(events, allFriends);
 
         return QuarterlySettlementResponse.builder()
                 .year(year)
@@ -74,7 +81,24 @@ public class SettlementService {
                 .worstFriends(worstFriends)
                 .friendsToMaintain(findFriendsToMaintain(allFriends, events))
                 .friendsNeedingAttention(findFriendsNeedingAttention(allFriends, events))
-                .solution(generateQuarterlySolution(events, bestFriends, worstFriends))
+                .solution(toQuarterlySolution(aiResult))
+                .build();
+    }
+
+    private RelationshipSolutionResponse toRelationshipSolution(MonthlyAnalysisResult result) {
+        return RelationshipSolutionResponse.builder()
+                .friendName(result.getFriendName())
+                .analysis(result.getAnalysis())
+                .suggestions(result.getSuggestions())
+                .build();
+    }
+
+    private QuarterlySolutionResponse toQuarterlySolution(QuarterlyAnalysisResult result) {
+        return QuarterlySolutionResponse.builder()
+                .overallAnalysis(result.getOverallAnalysis())
+                .positiveInsights(result.getPositiveInsights())
+                .negativeInsights(result.getNegativeInsights())
+                .actionItems(result.getActionItems())
                 .build();
     }
 
@@ -117,7 +141,7 @@ public class SettlementService {
 
         for (Gift gift : gifts) {
             int price = gift.getPrice() != null ? gift.getPrice() : 0;
-            
+
             if (gift.getDirection() == GiftDirection.GIVEN) {
                 givenCount++;
                 givenAmount += price;
@@ -218,12 +242,12 @@ public class SettlementService {
 
         for (Friend friend : allFriends) {
             LocalDate lastMeeting = lastMeetingByFriend.get(friend.getId());
-            
+
             if (lastMeeting == null) {
                 result.add(createMaintenanceResponse(friend, -1, "만남 기록이 없습니다. 연락해보세요."));
                 continue;
             }
-            
+
             long daysSince = ChronoUnit.DAYS.between(lastMeeting, now);
             if (daysSince < ATTENTION_DAYS_MIN) {
                 continue;
@@ -236,13 +260,13 @@ public class SettlementService {
 
     private Map<Long, LocalDate> buildLastMeetingMap(List<Event> events) {
         Map<Long, LocalDate> lastMeetingByFriend = new HashMap<>();
-        
+
         for (Event event : events) {
             Long friendId = event.getFriend().getId();
             LocalDate eventDate = event.getEventDate();
             lastMeetingByFriend.merge(friendId, eventDate, this::getLaterDate);
         }
-        
+
         return lastMeetingByFriend;
     }
 
@@ -262,137 +286,13 @@ public class SettlementService {
                 .build();
     }
 
-    private RelationshipSolutionResponse generateMonthlySolution(List<Event> events, TopFriendResponse topFriend) {
-        if (topFriend == null) {
-            return createEmptyMonthlySolution();
-        }
-
-        return createMonthlySolutionByScore(topFriend);
-    }
-
-    private RelationshipSolutionResponse createEmptyMonthlySolution() {
-        return RelationshipSolutionResponse.builder()
-                .friendName(null)
-                .analysis("이번 달 만남 기록이 없습니다.")
-                .suggestions(List.of("친구들과의 만남을 계획해보세요."))
-                .build();
-    }
-
-    private RelationshipSolutionResponse createMonthlySolutionByScore(TopFriendResponse topFriend) {
-        double score = topFriend.getAverageScore();
-        String friendName = topFriend.getFriendName();
-
-        if (score >= 4.0) {
-            return createPositiveSolution(friendName);
-        }
-        if (score >= 3.0) {
-            return createNeutralSolution(friendName);
-        }
-        return createNegativeSolution(friendName);
-    }
-
-    private RelationshipSolutionResponse createPositiveSolution(String friendName) {
-        return RelationshipSolutionResponse.builder()
-                .friendName(friendName)
-                .analysis(friendName + "님과의 관계가 매우 좋습니다.")
-                .suggestions(List.of("이 관계를 계속 유지하세요.", "특별한 날에 선물을 준비해보세요."))
-                .build();
-    }
-
-    private RelationshipSolutionResponse createNeutralSolution(String friendName) {
-        return RelationshipSolutionResponse.builder()
-                .friendName(friendName)
-                .analysis(friendName + "님과의 관계는 보통입니다.")
-                .suggestions(List.of("더 깊은 대화를 나눠보세요.", "함께 새로운 활동을 시도해보세요."))
-                .build();
-    }
-
-    private RelationshipSolutionResponse createNegativeSolution(String friendName) {
-        return RelationshipSolutionResponse.builder()
-                .friendName(friendName)
-                .analysis(friendName + "님과의 관계에 주의가 필요합니다.")
-                .suggestions(List.of("솔직한 대화를 통해 문제를 파악해보세요.", "관계 개선을 위한 노력이 필요합니다."))
-                .build();
-    }
-
-    private QuarterlySolutionResponse generateQuarterlySolution(
-            List<Event> events,
-            List<FriendRankResponse> bestFriends,
-            List<FriendRankResponse> worstFriends) {
-
-        List<String> positiveInsights = buildPositiveInsights(bestFriends);
-        List<String> negativeInsights = buildNegativeInsights(worstFriends);
-        List<String> actionItems = buildActionItems(events, worstFriends);
-        String overallAnalysis = buildOverallAnalysis(events.size());
-
-        return QuarterlySolutionResponse.builder()
-                .overallAnalysis(overallAnalysis)
-                .positiveInsights(positiveInsights)
-                .negativeInsights(negativeInsights)
-                .actionItems(actionItems)
-                .build();
-    }
-
-    private String buildOverallAnalysis(int totalMeetings) {
-        if (totalMeetings == 0) {
-            return "이번 분기 만남 기록이 없습니다.";
-        }
-        if (totalMeetings < 5) {
-            return "이번 분기 만남이 적은 편입니다.";
-        }
-        return "이번 분기 활발한 교류가 있었습니다.";
-    }
-
-    private List<String> buildPositiveInsights(List<FriendRankResponse> bestFriends) {
-        List<String> insights = new ArrayList<>();
-        
-        for (FriendRankResponse best : bestFriends) {
-            if (best.getAverageScore() < 4.0) {
-                continue;
-            }
-            insights.add(best.getFriendName() + "님과 좋은 관계를 유지하고 있습니다.");
-        }
-        
-        return insights;
-    }
-
-    private List<String> buildNegativeInsights(List<FriendRankResponse> worstFriends) {
-        List<String> insights = new ArrayList<>();
-        
-        for (FriendRankResponse worst : worstFriends) {
-            if (worst.getAverageScore() >= 3.0 || worst.getAverageScore() <= 0) {
-                continue;
-            }
-            insights.add(worst.getFriendName() + "님과의 관계 개선이 필요합니다.");
-        }
-        
-        return insights;
-    }
-
-    private List<String> buildActionItems(List<Event> events, List<FriendRankResponse> worstFriends) {
-        List<String> actionItems = new ArrayList<>();
-
-        if (events.isEmpty()) {
-            actionItems.add("친구들과의 만남을 계획해보세요.");
-        }
-
-        for (FriendRankResponse worst : worstFriends) {
-            if (worst.getAverageScore() >= 3.0 || worst.getAverageScore() <= 0) {
-                continue;
-            }
-            actionItems.add(worst.getFriendName() + "님과 솔직한 대화를 나눠보세요.");
-        }
-
-        return actionItems;
-    }
-
     private Map<Long, List<Event>> groupEventsByFriend(List<Event> events) {
         Map<Long, List<Event>> result = new HashMap<>();
-        
+
         for (Event event : events) {
             result.computeIfAbsent(event.getFriend().getId(), k -> new ArrayList<>()).add(event);
         }
-        
+
         return result;
     }
 

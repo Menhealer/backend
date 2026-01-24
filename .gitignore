@@ -1,12 +1,16 @@
 HELP.md
-README.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
-src/main/resources/application.*
-API_SPEC.md
+
+### 환경 설정 ###
+src/main/resources/application.yml
+src/main/resources/application-*.yml
+.env
+.env.local
+.env.*.local
 
 ### STS ###
 .apt_generated
@@ -38,3 +42,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### QueryDSL ###
+src/main/generated/

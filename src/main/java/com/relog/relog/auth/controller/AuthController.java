@@ -5,6 +5,7 @@ import com.relog.relog.auth.dto.EmailCheckResponse;
 import com.relog.relog.auth.dto.LoginRequest;
 import com.relog.relog.auth.dto.PasswordChangeRequest;
 import com.relog.relog.auth.dto.SignUpRequest;
+import com.relog.relog.auth.dto.TokenRefreshRequest;
 import com.relog.relog.auth.dto.TokenResponse;
 import com.relog.relog.auth.service.AuthService;
 import com.relog.relog.common.ApiResponse;
@@ -36,6 +37,18 @@ public class AuthController {
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenResponse>> refresh(@Valid @RequestBody TokenRefreshRequest request) {
+        TokenResponse response = authService.refresh(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long memberId) {
+        authService.logout(memberId);
+        return ResponseEntity.ok(ApiResponse.success());
     }
 
     @PostMapping("/email-check")

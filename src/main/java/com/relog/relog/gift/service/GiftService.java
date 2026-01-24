@@ -14,6 +14,7 @@ import com.relog.relog.gift.repository.GiftRepository;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -48,25 +49,25 @@ public class GiftService {
     }
 
     public List<GiftResponse> getAllGifts(Long memberId) {
-        return giftRepository.findAllByMemberId(memberId).stream()
+        return giftRepository.findAllWithFriendByMemberId(memberId).stream()
                 .map(GiftResponse::from)
                 .toList();
     }
 
     public List<GiftResponse> getGiftsByFriend(Long memberId, Long friendId) {
-        return giftRepository.findAllByMemberIdAndFriendId(memberId, friendId).stream()
+        return giftRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId).stream()
                 .map(GiftResponse::from)
                 .toList();
     }
 
     public List<GiftResponse> getGiftsByType(Long memberId, GiftType giftType) {
-        return giftRepository.findAllByMemberIdAndGiftType(memberId, giftType).stream()
+        return giftRepository.findAllWithFriendByMemberIdAndGiftType(memberId, giftType).stream()
                 .map(GiftResponse::from)
                 .toList();
     }
 
     public List<GiftResponse> getGiftsByDirection(Long memberId, GiftDirection direction) {
-        return giftRepository.findAllByMemberIdAndDirection(memberId, direction).stream()
+        return giftRepository.findAllWithFriendByMemberIdAndDirection(memberId, direction).stream()
                 .map(GiftResponse::from)
                 .toList();
     }
@@ -120,7 +121,7 @@ public class GiftService {
         gift.updatePrice(price);
     }
 
-    private void updateGiftDate(Gift gift, java.time.LocalDate giftDate) {
+    private void updateGiftDate(Gift gift, LocalDate giftDate) {
         if (giftDate == null) {
             return;
         }
