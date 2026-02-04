@@ -1,6 +1,8 @@
 package com.relog.relog.auth.service;
 
 import com.relog.relog.auth.dto.SocialLoginRequest;
+import com.relog.relog.auth.dto.SocialLoginResponse;
+import com.relog.relog.auth.dto.SocialSignUpRequest;
 import com.relog.relog.auth.dto.SocialUserInfo;
 import com.relog.relog.auth.dto.TokenResponse;
 import com.relog.relog.auth.exception.InvalidTokenException;
@@ -27,23 +29,47 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final SocialAuthClientFactory socialAuthClientFactory;
 
-    @Transactional
-    public TokenResponse socialLogin(SocialLoginRequest request) {
-        SocialProvider provider;
-        try {
-            provider = SocialProvider.valueOf(request.getProvider().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new SocialAuthenticationException("지원하지 않는 소셜 로그인 제공자입니다.");
-        }
-
+    public SocialLoginResponse socialLogin(SocialLoginRequest request) {
+        SocialProvider provider = parseProvider(request.getProvider());
         SocialAuthClient client = socialAuthClientFactory.getClient(provider);
         SocialUserInfo userInfo = client.getUserInfo(request.getToken());
 
-        RelogMember member = memberRepository
+        return memberRepository
                 .findByProviderAndProviderId(provider, userInfo.getProviderId())
-                .orElseGet(() -> createMember(userInfo));
+                .map(member -> {
+                    TokenResponse tokens = createTokenResponse(member.getId());
+                    return SocialLoginResponse.builder()
+                            .isNewMember(false)
+                            .accessToken(tokens.getAccessToken())
+                            .refreshToken(tokens.getRefreshToken())
+                            .build();
+                })
+                .orElse(SocialLoginResponse.builder()
+                        .isNewMember(true)
+                        .build());
+    }
 
-        return createTokenResponse(member.getId());
+    @Transactional
+    public TokenResponse signUp(SocialSignUpRequest request) {
+        SocialProvider provider = parseProvider(request.getProvider());
+        SocialAuthClient client = socialAuthClientFactory.getClient(provider);
+        SocialUserInfo userInfo = client.getUserInfo(request.getToken());
+
+        memberRepository.findByProviderAndProviderId(provider, userInfo.getProviderId())
+                .ifPresent(member -> {
+                    throw new SocialAuthenticationException("이미 가입된 회원입니다.");
+                });
+
+        RelogMember member = RelogMember.builder()
+                .provider(provider)
+                .providerId(userInfo.getProviderId())
+                .email(userInfo.getEmail())
+                .nickname(request.getNickname())
+                .birthday(request.getBirthday())
+                .build();
+
+        RelogMember savedMember = memberRepository.save(member);
+        return createTokenResponse(savedMember.getId());
     }
 
     public TokenResponse refresh(String refreshToken) {
@@ -65,21 +91,12 @@ public class AuthService {
         tokenGenerator.invalidateRefreshToken(memberId);
     }
 
-    private RelogMember createMember(SocialUserInfo userInfo) {
-        RelogMember member = RelogMember.builder()
-                .provider(userInfo.getProvider())
-                .providerId(userInfo.getProviderId())
-                .email(userInfo.getEmail())
-                .nickname(generateDefaultNickname(userInfo))
-                .build();
-        return memberRepository.save(member);
-    }
-
-    private String generateDefaultNickname(SocialUserInfo userInfo) {
-        if (userInfo.getNickname() != null && !userInfo.getNickname().isBlank()) {
-            return userInfo.getNickname();
+    private SocialProvider parseProvider(String provider) {
+        try {
+            return SocialProvider.valueOf(provider.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new SocialAuthenticationException("지원하지 않는 소셜 로그인 제공자입니다.");
         }
-        return "사용자" + System.currentTimeMillis() % 100000;
     }
 
     private void validateRefreshToken(String refreshToken) {
