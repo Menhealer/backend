@@ -3,10 +3,13 @@ package com.relog.relog.member.entity;
 import com.relog.relog.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -21,7 +24,9 @@ import org.hibernate.annotations.SQLRestriction;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @SuperBuilder
-@Table(name = "relog_member")
+@Table(name = "relog_member", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"provider", "provider_id"})
+})
 @SQLRestriction("is_deleted = false")
 @SQLDelete(sql = "UPDATE relog_member SET is_deleted = true WHERE id = ?")
 public class RelogMember extends BaseEntity {
@@ -30,11 +35,15 @@ public class RelogMember extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "email", length = 100, unique = true, nullable = false)
+    @Column(name = "email", length = 100)
     private String email;
 
-    @Column(name = "password", length = 255, nullable = false)
-    private String password;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false, length = 20)
+    private SocialProvider provider;
+
+    @Column(name = "provider_id", nullable = false, length = 255)
+    private String providerId;
 
     @Column(name = "nickname", length = 20, nullable = false)
     private String nickname;
@@ -44,10 +53,6 @@ public class RelogMember extends BaseEntity {
 
     @Column(name = "profile_image", length = 500)
     private String profileImage;
-
-    public void updatePassword(String encodedPassword) {
-        this.password = encodedPassword;
-    }
 
     public void updateNickname(String nickname) {
         this.nickname = nickname;

@@ -1,21 +1,15 @@
 package com.relog.relog.auth.controller;
 
-import com.relog.relog.auth.dto.EmailCheckRequest;
-import com.relog.relog.auth.dto.EmailCheckResponse;
-import com.relog.relog.auth.dto.LoginRequest;
-import com.relog.relog.auth.dto.PasswordChangeRequest;
-import com.relog.relog.auth.dto.SignUpRequest;
+import com.relog.relog.auth.dto.SocialLoginRequest;
 import com.relog.relog.auth.dto.TokenRefreshRequest;
 import com.relog.relog.auth.dto.TokenResponse;
 import com.relog.relog.auth.service.AuthService;
 import com.relog.relog.common.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,20 +21,16 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<TokenResponse>> signUp(@Valid @RequestBody SignUpRequest request) {
-        TokenResponse response = authService.signUp(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
-        TokenResponse response = authService.login(request);
+    @PostMapping("/social-login")
+    public ResponseEntity<ApiResponse<TokenResponse>> socialLogin(
+            @Valid @RequestBody SocialLoginRequest request) {
+        TokenResponse response = authService.socialLogin(request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<TokenResponse>> refresh(@Valid @RequestBody TokenRefreshRequest request) {
+    public ResponseEntity<ApiResponse<TokenResponse>> refresh(
+            @Valid @RequestBody TokenRefreshRequest request) {
         TokenResponse response = authService.refresh(request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -48,21 +38,6 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long memberId) {
         authService.logout(memberId);
-        return ResponseEntity.ok(ApiResponse.success());
-    }
-
-    @PostMapping("/email-check")
-    public ResponseEntity<ApiResponse<EmailCheckResponse>> checkEmail(@Valid @RequestBody EmailCheckRequest request) {
-        boolean isDuplicate = authService.checkEmailDuplicate(request.getEmail());
-        EmailCheckResponse response = new EmailCheckResponse(isDuplicate);
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    @PutMapping("/password")
-    public ResponseEntity<ApiResponse<Void>> changePassword(
-            @AuthenticationPrincipal Long memberId,
-            @Valid @RequestBody PasswordChangeRequest request) {
-        authService.changePassword(memberId, request);
         return ResponseEntity.ok(ApiResponse.success());
     }
 }
