@@ -60,6 +60,8 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
           cd ~/relog
+          git pull origin main
           docker-compose pull backend
-          docker-compose up -d backend
+          docker-compose down backend
+          docker-compose up -d
           docker image prune -f
