@@ -9,6 +9,7 @@ import com.relog.relog.gift.entity.GiftDirection;
 import com.relog.relog.gift.entity.GiftType;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -78,5 +79,18 @@ public class GiftRepositoryImpl implements GiftRepositoryCustom {
                 )
                 .orderBy(gift.giftDate.desc())
                 .fetch();
+    }
+
+    @Override
+    public Optional<Gift> findByIdAndMemberIdWithFriend(Long id, Long memberId) {
+        Gift result = queryFactory
+                .selectFrom(gift)
+                .join(gift.friend, friend).fetchJoin()
+                .where(
+                        gift.id.eq(id),
+                        gift.member.id.eq(memberId)
+                )
+                .fetchOne();
+        return Optional.ofNullable(result);
     }
 }

@@ -8,6 +8,7 @@ import com.relog.relog.auth.exception.EmailAlreadyExistsException;
 import com.relog.relog.auth.exception.InvalidCredentialsException;
 import com.relog.relog.auth.exception.InvalidPasswordException;
 import com.relog.relog.auth.exception.InvalidTokenException;
+import com.relog.relog.jwt.JwtType;
 import com.relog.relog.jwt.JwtUtil;
 import com.relog.relog.jwt.TokenGenerator;
 import com.relog.relog.member.entity.RelogMember;
@@ -105,7 +106,7 @@ public class AuthService {
     }
 
     private void validateRefreshToken(String refreshToken) {
-        if (!jwtUtil.validateToken(refreshToken)) {
+        if (!jwtUtil.validateToken(refreshToken, JwtType.REFRESH)) {
             throw new InvalidTokenException();
         }
     }

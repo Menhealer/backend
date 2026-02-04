@@ -7,6 +7,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.relog.relog.event.entity.Event;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -53,5 +54,18 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
                 )
                 .orderBy(event.eventDate.asc())
                 .fetch();
+    }
+
+    @Override
+    public Optional<Event> findByIdAndMemberIdWithFriend(Long id, Long memberId) {
+        Event result = queryFactory
+                .selectFrom(event)
+                .join(event.friend, friend).fetchJoin()
+                .where(
+                        event.id.eq(id),
+                        event.member.id.eq(memberId)
+                )
+                .fetchOne();
+        return Optional.ofNullable(result);
     }
 }

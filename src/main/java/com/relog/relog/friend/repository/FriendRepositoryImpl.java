@@ -6,6 +6,7 @@ import static com.relog.relog.friendgroup.entity.QFriendGroup.friendGroup;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.relog.relog.friend.entity.Friend;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -36,5 +37,18 @@ public class FriendRepositoryImpl implements FriendRepositoryCustom {
                 )
                 .orderBy(friend.name.asc())
                 .fetch();
+    }
+
+    @Override
+    public Optional<Friend> findByIdAndMemberIdWithGroup(Long id, Long memberId) {
+        Friend result = queryFactory
+                .selectFrom(friend)
+                .leftJoin(friend.friendGroup, friendGroup).fetchJoin()
+                .where(
+                        friend.id.eq(id),
+                        friend.member.id.eq(memberId)
+                )
+                .fetchOne();
+        return Optional.ofNullable(result);
     }
 }

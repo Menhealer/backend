@@ -40,24 +40,19 @@ public class JwtUtil {
                 .subject(String.valueOf(memberId))
                 .claim(ROLE_CLAIM, roles)
                 .claim(TYPE_CLAIM, type.name())
+                .issuedAt(new Date())
                 .signWith(key)
                 .expiration(expiredTime)
                 .compact();
     }
 
-    public boolean validateToken(String token) {
+    public boolean validateToken(String token, JwtType expectedType) {
         try {
-            getClaims(token);
-            return true;
-        } catch (ExpiredJwtException e) {
-            return false;
-        } catch (MalformedJwtException e) {
-            return false;
-        } catch (SignatureException e) {
-            return false;
-        } catch (UnsupportedJwtException e) {
-            return false;
-        } catch (IllegalArgumentException e) {
+            Claims claims = getClaims(token);
+            String type = claims.get(TYPE_CLAIM, String.class);
+            return expectedType.name().equals(type);
+        } catch (ExpiredJwtException | MalformedJwtException | SignatureException
+                 | UnsupportedJwtException | IllegalArgumentException e) {
             return false;
         }
     }

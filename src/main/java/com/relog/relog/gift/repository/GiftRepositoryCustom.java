@@ -5,6 +5,7 @@ import com.relog.relog.gift.entity.GiftDirection;
 import com.relog.relog.gift.entity.GiftType;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface GiftRepositoryCustom {
 
@@ -17,4 +18,6 @@ public interface GiftRepositoryCustom {
     List<Gift> findAllWithFriendByMemberIdAndDirection(Long memberId, GiftDirection direction);
 
     List<Gift> findAllWithFriendByMemberIdAndDateRange(Long memberId, LocalDate startDate, LocalDate endDate);
+
+    Optional<Gift> findByIdAndMemberIdWithFriend(Long id, Long memberId);
 }
