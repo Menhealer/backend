@@ -6,7 +6,7 @@ import com.relog.relog.member.dto.ProfileImageResponse;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
-import com.relog.relog.storage.S3StorageService;
+import com.relog.relog.storage.OciStorageService;
 import java.io.IOException;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class MemberService {
 
     private final RelogMemberRepository memberRepository;
-    private final S3StorageService s3StorageService;
+    private final OciStorageService s3StorageService;
 
     public MemberResponse getMember(Long memberId) {
         RelogMember member = findMemberById(memberId);
