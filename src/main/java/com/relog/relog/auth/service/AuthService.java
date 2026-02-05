@@ -12,6 +12,7 @@ import com.relog.relog.auth.social.SocialAuthClientFactory;
 import com.relog.relog.jwt.JwtType;
 import com.relog.relog.jwt.JwtUtil;
 import com.relog.relog.jwt.TokenGenerator;
+import com.relog.relog.member.dto.MemberResponse;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.entity.SocialProvider;
 import com.relog.relog.member.repository.RelogMemberRepository;
@@ -42,6 +43,7 @@ public class AuthService {
                             .isNewMember(false)
                             .accessToken(tokens.getAccessToken())
                             .refreshToken(tokens.getRefreshToken())
+                            .member(MemberResponse.from(member))
                             .build();
                 })
                 .orElse(SocialLoginResponse.builder()
@@ -69,7 +71,12 @@ public class AuthService {
                 .build();
 
         RelogMember savedMember = memberRepository.save(member);
-        return createTokenResponse(savedMember.getId());
+        TokenResponse tokens = createTokenResponse(savedMember.getId());
+        return TokenResponse.builder()
+                .accessToken(tokens.getAccessToken())
+                .refreshToken(tokens.getRefreshToken())
+                .member(MemberResponse.from(savedMember))
+                .build();
     }
 
     public TokenResponse refresh(String refreshToken) {
