@@ -9,7 +9,6 @@ import com.relog.relog.member.repository.RelogMemberRepository;
 import com.relog.relog.storage.OciStorageService;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class MemberService {
 
     private final RelogMemberRepository memberRepository;
-    private final Optional<OciStorageService> s3StorageService;
+    private final OciStorageService ociStorageService;
 
     public MemberResponse getMember(Long memberId) {
         RelogMember member = findMemberById(memberId);
@@ -44,9 +43,7 @@ public class MemberService {
 
         deleteExistingProfileImage(member);
 
-        String imageUrl = s3StorageService
-                .orElseThrow(() -> new UnsupportedOperationException("스토리지 서비스를 사용할 수 없습니다."))
-                .uploadProfileImage(memberId, file);
+        String imageUrl = ociStorageService.uploadProfileImage(memberId, file);
         member.updateProfileImage(imageUrl);
 
         return new ProfileImageResponse(imageUrl);
@@ -77,7 +74,7 @@ public class MemberService {
         if (member.getProfileImage() == null) {
             return;
         }
-        s3StorageService.ifPresent(service -> service.deleteProfileImage(member.getProfileImage()));
+        ociStorageService.deleteProfileImage(member.getProfileImage());
     }
 
     private void updateNickname(RelogMember member, String nickname) {
