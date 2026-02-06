@@ -10,6 +10,4 @@ import org.springframework.stereotype.Repository;
 public interface RelogMemberRepository extends JpaRepository<RelogMember, Long> {
 
     Optional<RelogMember> findByProviderAndProviderId(SocialProvider provider, String providerId);
-
-    Optional<RelogMember> findByEmail(String email);
 }
