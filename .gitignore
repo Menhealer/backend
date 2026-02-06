@@ -48,6 +48,4 @@ src/main/generated/
 
 ### Project specific ###
 .claude/settings.local.json
-src/main/java/com/relog/relog/config/OciObjectStorageConfig.java
-src/main/java/com/relog/relog/storage/OciStorageService.java
 API_SPEC.md
