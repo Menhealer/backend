@@ -11,19 +11,9 @@ import lombok.Getter;
 public class FriendDetailResponse {
 
     private FriendResponse friend;
-    private RelationshipScoreResponse relationshipScore;
+    private Integer score;
     private List<EventSummaryResponse> recentEvents;
     private List<GiftSummaryResponse> giftHistory;
-
-    @Getter
-    @AllArgsConstructor
-    @Builder
-    public static class RelationshipScoreResponse {
-        private int totalMeetings;
-        private double averageScore;
-        private int positiveCount;
-        private int negativeCount;
-    }
 
     @Getter
     @AllArgsConstructor

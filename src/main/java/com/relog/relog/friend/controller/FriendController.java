@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -41,9 +40,8 @@ public class FriendController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<FriendResponse>>> getAllFriends(
-            @AuthenticationPrincipal Long memberId,
-            @RequestParam(required = false) Long groupId) {
-        List<FriendResponse> responses = getFriendList(memberId, groupId);
+            @AuthenticationPrincipal Long memberId) {
+        List<FriendResponse> responses = friendService.getAllFriends(memberId);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
@@ -79,12 +77,5 @@ public class FriendController {
             @PathVariable Long friendId) {
         friendService.deleteFriend(memberId, friendId);
         return ResponseEntity.ok(ApiResponse.success());
-    }
-
-    private List<FriendResponse> getFriendList(Long memberId, Long groupId) {
-        if (groupId != null) {
-            return friendService.getFriendsByGroup(memberId, groupId);
-        }
-        return friendService.getAllFriends(memberId);
     }
 }

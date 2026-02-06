@@ -35,9 +35,6 @@ public class RelogMember extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "email", length = 100)
-    private String email;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false, length = 20)
     private SocialProvider provider;

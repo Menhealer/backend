@@ -1,6 +1,7 @@
 package com.relog.relog.friend.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -10,9 +11,10 @@ import lombok.NoArgsConstructor;
 public class FriendCreateRequest {
 
     @NotBlank(message = "친구 이름은 필수입니다.")
+    @Size(max = 10, message = "친구 이름은 10자 이하여야 합니다.")
     private String name;
 
     private LocalDate birthday;
 
-    private Long groupId;
+    private String group;
 }

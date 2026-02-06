@@ -7,8 +7,6 @@ import com.relog.relog.event.dto.EventResponse;
 import com.relog.relog.event.dto.EventUpdateRequest;
 import com.relog.relog.event.service.EventService;
 import jakarta.validation.Valid;
-import java.time.LocalDate;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,14 +34,6 @@ public class EventController {
             @Valid @RequestBody EventCreateRequest request) {
         EventResponse response = eventService.createEvent(memberId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
-    }
-
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<EventResponse>>> getEventsByDate(
-            @AuthenticationPrincipal Long memberId,
-            @RequestParam LocalDate date) {
-        List<EventResponse> responses = eventService.getEventsByDate(memberId, date);
-        return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
     @GetMapping("/{eventId}")

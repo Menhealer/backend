@@ -14,16 +14,14 @@ public class FriendResponse {
     private Long id;
     private String name;
     private LocalDate birthday;
-    private Long groupId;
-    private String groupName;
+    private int score;
 
     public static FriendResponse from(Friend friend) {
         return FriendResponse.builder()
                 .id(friend.getId())
                 .name(friend.getName())
                 .birthday(friend.getBirthday())
-                .groupId(friend.getFriendGroup() != null ? friend.getFriendGroup().getId() : null)
-                .groupName(friend.getFriendGroup() != null ? friend.getFriendGroup().getName() : null)
+                .score(friend.getScore())
                 .build();
     }
 }

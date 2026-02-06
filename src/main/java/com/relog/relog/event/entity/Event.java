@@ -37,7 +37,7 @@ public class Event extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "title", length = 100, nullable = false)
+    @Column(name = "title", length = 12, nullable = false)
     private String title;
 
     @Column(name = "event_date", nullable = false)
@@ -47,7 +47,7 @@ public class Event extends BaseEntity {
     @Column(name = "review_score")
     private ReviewScore reviewScore;
 
-    @Column(name = "review_text", length = 500)
+    @Column(name = "review_text", length = 100)
     private String reviewText;
 
     @ManyToOne(fetch = FetchType.LAZY)

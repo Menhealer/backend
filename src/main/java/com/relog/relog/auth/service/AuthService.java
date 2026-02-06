@@ -65,7 +65,6 @@ public class AuthService {
         RelogMember member = RelogMember.builder()
                 .provider(provider)
                 .providerId(userInfo.getProviderId())
-                .email(userInfo.getEmail())
                 .nickname(request.getNickname())
                 .birthday(request.getBirthday())
                 .build();

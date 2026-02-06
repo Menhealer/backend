@@ -13,7 +13,6 @@ import lombok.Getter;
 public class MemberResponse {
 
     private Long id;
-    private String email;
     private String nickname;
     private LocalDate birthday;
     private String profileImage;
@@ -22,7 +21,6 @@ public class MemberResponse {
     public static MemberResponse from(RelogMember member) {
         return MemberResponse.builder()
                 .id(member.getId())
-                .email(member.getEmail())
                 .nickname(member.getNickname())
                 .birthday(member.getBirthday())
                 .profileImage(member.getProfileImage())

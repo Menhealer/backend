@@ -1,6 +1,7 @@
 package com.relog.relog.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,5 +19,6 @@ public class SocialSignUpRequest {
     @NotBlank(message = "닉네임은 필수입니다.")
     private String nickname;
 
+    @NotNull(message = "생년월일은 필수입니다.")
     private LocalDate birthday;
 }

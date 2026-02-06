@@ -1,7 +1,6 @@
 package com.relog.relog.friend.entity;
 
 import com.relog.relog.common.BaseEntity;
-import com.relog.relog.friendgroup.entity.FriendGroup;
 import com.relog.relog.member.entity.RelogMember;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,6 +14,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -35,7 +35,7 @@ public class Friend extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name", length = 50, nullable = false)
+    @Column(name = "name", length = 10, nullable = false)
     private String name;
 
     @Column(name = "birthday")
@@ -45,9 +45,12 @@ public class Friend extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false)
     private RelogMember member;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id")
-    private FriendGroup friendGroup;
+    @Column(name = "friend_group", length = 50)
+    private String group;
+
+    @Builder.Default
+    @Column(name = "score", nullable = false)
+    private int score = 0;
 
     public void updateName(String name) {
         this.name = name;
@@ -57,7 +60,11 @@ public class Friend extends BaseEntity {
         this.birthday = birthday;
     }
 
-    public void updateFriendGroup(FriendGroup friendGroup) {
-        this.friendGroup = friendGroup;
+    public void updateGroup(String group) {
+        this.group = group;
+    }
+
+    public void updateScore(int score) {
+        this.score = Math.max(-100, Math.min(100, score));
     }
 }

@@ -11,7 +11,5 @@ public interface EventRepositoryCustom {
 
     List<Event> findAllWithFriendByMemberIdAndFriendId(Long memberId, Long friendId);
 
-    List<Event> findAllWithFriendByMemberIdAndDate(Long memberId, LocalDate date);
-
     Optional<Event> findByIdAndMemberIdWithFriend(Long id, Long memberId);
 }

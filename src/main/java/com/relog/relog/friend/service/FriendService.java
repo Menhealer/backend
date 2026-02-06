@@ -7,22 +7,19 @@ import com.relog.relog.friend.dto.FriendCreateRequest;
 import com.relog.relog.friend.dto.FriendDetailResponse;
 import com.relog.relog.friend.dto.FriendDetailResponse.EventSummaryResponse;
 import com.relog.relog.friend.dto.FriendDetailResponse.GiftSummaryResponse;
-import com.relog.relog.friend.dto.FriendDetailResponse.RelationshipScoreResponse;
 import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.friend.dto.FriendUpdateRequest;
 import com.relog.relog.friend.entity.Friend;
 import com.relog.relog.friend.exception.FriendNameDuplicateException;
 import com.relog.relog.friend.exception.FriendNotFoundException;
 import com.relog.relog.friend.repository.FriendRepository;
-import com.relog.relog.friendgroup.entity.FriendGroup;
-import com.relog.relog.friendgroup.exception.FriendGroupNotFoundException;
-import com.relog.relog.friendgroup.repository.FriendGroupRepository;
 import com.relog.relog.gift.entity.Gift;
 import com.relog.relog.gift.repository.GiftRepository;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,48 +32,41 @@ public class FriendService {
 
     private final FriendRepository friendRepository;
     private final RelogMemberRepository memberRepository;
-    private final FriendGroupRepository friendGroupRepository;
     private final EventRepository eventRepository;
     private final GiftRepository giftRepository;
+    private final RelationshipScoreCalculator scoreCalculator;
 
     @Transactional
     public FriendResponse createFriend(Long memberId, FriendCreateRequest request) {
         RelogMember member = findMemberById(memberId);
         validateFriendNameNotDuplicate(memberId, request.getName());
-        FriendGroup friendGroup = findFriendGroupIfExists(request.getGroupId(), memberId);
 
         Friend friend = Friend.builder()
                 .name(request.getName())
                 .birthday(request.getBirthday())
                 .member(member)
-                .friendGroup(friendGroup)
+                .group(request.getGroup())
                 .build();
 
         return FriendResponse.from(friendRepository.save(friend));
     }
 
     public List<FriendResponse> getAllFriends(Long memberId) {
-        return friendRepository.findAllWithGroupByMemberId(memberId).stream()
-                .map(FriendResponse::from)
-                .toList();
-    }
-
-    public List<FriendResponse> getFriendsByGroup(Long memberId, Long groupId) {
-        return friendRepository.findAllWithGroupByMemberIdAndGroupId(memberId, groupId).stream()
+        return friendRepository.findAllByMemberIdOrderByName(memberId).stream()
                 .map(FriendResponse::from)
                 .toList();
     }
 
     public FriendDetailResponse getFriendDetail(Long memberId, Long friendId) {
-        Friend friend = findFriendByIdAndMemberIdWithGroup(friendId, memberId);
+        Friend friend = findFriendByIdAndMemberId(friendId, memberId);
         List<Event> events = eventRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
         List<Gift> gifts = giftRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
 
         return FriendDetailResponse.builder()
                 .friend(FriendResponse.from(friend))
-                .relationshipScore(calculateRelationshipScore(events))
-                .recentEvents(toEventSummaries(events))
-                .giftHistory(toGiftSummaries(gifts))
+                .score(scoreCalculator.calculate(events, gifts))
+                .recentEvents(toRecentEventSummaries(events))
+                .giftHistory(toRecentGiftSummaries(gifts))
                 .build();
     }
 
@@ -90,7 +80,7 @@ public class FriendService {
 
         updateFriendName(friend, request.getName(), memberId);
         updateFriendBirthday(friend, request.getBirthday());
-        updateFriendGroup(friend, request.getGroupId(), memberId);
+        updateFriendGroup(friend, request.getGroup());
 
         return FriendResponse.from(friend);
     }
@@ -101,6 +91,16 @@ public class FriendService {
         friendRepository.delete(friend);
     }
 
+    @Transactional
+    public void recalculateScore(Long memberId, Long friendId) {
+        Friend friend = findFriendByIdAndMemberId(friendId, memberId);
+        List<Event> events = eventRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
+        List<Gift> gifts = giftRepository.findAllWithFriendByMemberIdAndFriendId(memberId, friendId);
+
+        int score = scoreCalculator.calculate(events, gifts);
+        friend.updateScore(score);
+    }
+
     private RelogMember findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
@@ -109,19 +109,6 @@ public class FriendService {
     private Friend findFriendByIdAndMemberId(Long friendId, Long memberId) {
         return friendRepository.findByIdAndMemberId(friendId, memberId)
                 .orElseThrow(FriendNotFoundException::new);
-    }
-
-    private Friend findFriendByIdAndMemberIdWithGroup(Long friendId, Long memberId) {
-        return friendRepository.findByIdAndMemberIdWithGroup(friendId, memberId)
-                .orElseThrow(FriendNotFoundException::new);
-    }
-
-    private FriendGroup findFriendGroupIfExists(Long groupId, Long memberId) {
-        if (groupId == null) {
-            return null;
-        }
-        return friendGroupRepository.findByIdAndMemberId(groupId, memberId)
-                .orElseThrow(FriendGroupNotFoundException::new);
     }
 
     private void validateFriendNameNotDuplicate(Long memberId, String name) {
@@ -148,77 +135,17 @@ public class FriendService {
         friend.updateBirthday(birthday);
     }
 
-    private void updateFriendGroup(Friend friend, Long groupId, Long memberId) {
-        if (groupId == null) {
+    private void updateFriendGroup(Friend friend, String group) {
+        if (group == null) {
             return;
         }
-        FriendGroup friendGroup = findFriendGroupIfExists(groupId, memberId);
-        friend.updateFriendGroup(friendGroup);
+        friend.updateGroup(group);
     }
 
-    private RelationshipScoreResponse calculateRelationshipScore(List<Event> events) {
-        if (events.isEmpty()) {
-            return createEmptyRelationshipScore();
-        }
-
-        int positiveCount = 0;
-        int negativeCount = 0;
-        int totalScore = 0;
-        int scoredCount = 0;
-
-        for (Event event : events) {
-            if (event.getReviewScore() == null) {
-                continue;
-            }
-            int score = event.getReviewScore().getScore();
-            totalScore += score;
-            scoredCount++;
-            positiveCount += countPositive(score);
-            negativeCount += countNegative(score);
-        }
-
-        double averageScore = calculateAverage(totalScore, scoredCount);
-
-        return RelationshipScoreResponse.builder()
-                .totalMeetings(events.size())
-                .averageScore(averageScore)
-                .positiveCount(positiveCount)
-                .negativeCount(negativeCount)
-                .build();
-    }
-
-    private RelationshipScoreResponse createEmptyRelationshipScore() {
-        return RelationshipScoreResponse.builder()
-                .totalMeetings(0)
-                .averageScore(0.0)
-                .positiveCount(0)
-                .negativeCount(0)
-                .build();
-    }
-
-    private int countPositive(int score) {
-        if (score >= 4) {
-            return 1;
-        }
-        return 0;
-    }
-
-    private int countNegative(int score) {
-        if (score <= 2) {
-            return 1;
-        }
-        return 0;
-    }
-
-    private double calculateAverage(int total, int count) {
-        if (count == 0) {
-            return 0.0;
-        }
-        return (double) total / count;
-    }
-
-    private List<EventSummaryResponse> toEventSummaries(List<Event> events) {
+    private List<EventSummaryResponse> toRecentEventSummaries(List<Event> events) {
         return events.stream()
+                .sorted(Comparator.comparing(Event::getEventDate).reversed())
+                .limit(3)
                 .map(this::toEventSummary)
                 .toList();
     }
@@ -239,8 +166,10 @@ public class FriendService {
         return reviewScore.name();
     }
 
-    private List<GiftSummaryResponse> toGiftSummaries(List<Gift> gifts) {
+    private List<GiftSummaryResponse> toRecentGiftSummaries(List<Gift> gifts) {
         return gifts.stream()
+                .sorted(Comparator.comparing(Gift::getGiftDate).reversed())
+                .limit(3)
                 .map(this::toGiftSummary)
                 .toList();
     }

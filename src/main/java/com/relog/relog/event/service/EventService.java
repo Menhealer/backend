@@ -12,6 +12,7 @@ import com.relog.relog.event.repository.EventRepository;
 import com.relog.relog.friend.entity.Friend;
 import com.relog.relog.friend.exception.FriendNotFoundException;
 import com.relog.relog.friend.repository.FriendRepository;
+import com.relog.relog.friend.service.FriendService;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
@@ -33,6 +34,7 @@ public class EventService {
     private final EventRepository eventRepository;
     private final RelogMemberRepository memberRepository;
     private final FriendRepository friendRepository;
+    private final FriendService friendService;
 
     @Transactional
     public EventResponse createEvent(Long memberId, EventCreateRequest request) {
@@ -48,13 +50,9 @@ public class EventService {
                 .friend(friend)
                 .build();
 
-        return EventResponse.from(eventRepository.save(event));
-    }
-
-    public List<EventResponse> getEventsByDate(Long memberId, LocalDate date) {
-        return eventRepository.findAllWithFriendByMemberIdAndDate(memberId, date).stream()
-                .map(EventResponse::from)
-                .toList();
+        Event savedEvent = eventRepository.save(event);
+        friendService.recalculateScore(memberId, friend.getId());
+        return EventResponse.from(savedEvent);
     }
 
     public EventResponse getEvent(Long memberId, Long eventId) {
@@ -84,19 +82,27 @@ public class EventService {
     @Transactional
     public EventResponse updateEvent(Long memberId, Long eventId, EventUpdateRequest request) {
         Event event = findEventByIdAndMemberId(eventId, memberId);
+        Long previousFriendId = event.getFriend().getId();
 
         updateEventTitle(event, request.getTitle());
         updateEventDate(event, request.getEventDate());
         updateEventFriend(event, request.getFriendId(), memberId);
         updateEventReview(event, request);
 
+        Long currentFriendId = event.getFriend().getId();
+        friendService.recalculateScore(memberId, currentFriendId);
+        if (!previousFriendId.equals(currentFriendId)) {
+            friendService.recalculateScore(memberId, previousFriendId);
+        }
         return EventResponse.from(event);
     }
 
     @Transactional
     public void deleteEvent(Long memberId, Long eventId) {
         Event event = findEventByIdAndMemberId(eventId, memberId);
+        Long friendId = event.getFriend().getId();
         eventRepository.delete(event);
+        friendService.recalculateScore(memberId, friendId);
     }
 
     private RelogMember findMemberById(Long memberId) {

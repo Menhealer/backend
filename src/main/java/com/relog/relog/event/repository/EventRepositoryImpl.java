@@ -44,19 +44,6 @@ public class EventRepositoryImpl implements EventRepositoryCustom {
     }
 
     @Override
-    public List<Event> findAllWithFriendByMemberIdAndDate(Long memberId, LocalDate date) {
-        return queryFactory
-                .selectFrom(event)
-                .join(event.friend, friend).fetchJoin()
-                .where(
-                        event.member.id.eq(memberId),
-                        event.eventDate.eq(date)
-                )
-                .orderBy(event.eventDate.asc())
-                .fetch();
-    }
-
-    @Override
     public Optional<Event> findByIdAndMemberIdWithFriend(Long id, Long memberId) {
         Event result = queryFactory
                 .selectFrom(event)
