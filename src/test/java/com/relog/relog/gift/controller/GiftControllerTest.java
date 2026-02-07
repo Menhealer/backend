@@ -68,7 +68,6 @@ class GiftControllerTest {
     private GiftResponse createGiftResponse() {
         return GiftResponse.builder()
                 .id(1L)
-                .itemName("생일선물")
                 .price(50000)
                 .giftDate(LocalDate.of(2025, 3, 10))
                 .giftType(GiftType.BIRTHDAY)
@@ -89,7 +88,6 @@ class GiftControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                    "itemName": "생일선물",
                                     "price": 50000,
                                     "giftDate": "2025-03-10",
                                     "giftType": "BIRTHDAY",
@@ -100,7 +98,6 @@ class GiftControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.itemName").value("생일선물"))
                 .andExpect(jsonPath("$.data.price").value(50000))
                 .andExpect(jsonPath("$.data.giftType").value("BIRTHDAY"))
                 .andExpect(jsonPath("$.data.direction").value("GIVEN"));
@@ -115,7 +112,7 @@ class GiftControllerTest {
         mockMvc.perform(get("/gifts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].itemName").value("생일선물"));
+                .andExpect(jsonPath("$.data[0].description").value("좋아하는 브랜드"));
     }
 
     @Test
@@ -156,7 +153,6 @@ class GiftControllerTest {
     void updateGift() throws Exception {
         GiftResponse updatedResponse = GiftResponse.builder()
                 .id(1L)
-                .itemName("수정된 선물")
                 .price(30000)
                 .giftDate(LocalDate.of(2025, 3, 10))
                 .giftType(GiftType.BIRTHDAY)
@@ -172,12 +168,10 @@ class GiftControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                    "itemName": "수정된 선물",
                                     "price": 30000
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.itemName").value("수정된 선물"))
                 .andExpect(jsonPath("$.data.price").value(30000));
     }
 

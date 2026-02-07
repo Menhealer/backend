@@ -15,7 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.relog.relog.common.exception.GlobalExceptionHandler;
 import com.relog.relog.friend.dto.FriendCreateRequest;
 import com.relog.relog.friend.dto.FriendDetailResponse;
-import com.relog.relog.friend.dto.FriendDetailResponse.RelationshipScoreResponse;
 import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.friend.dto.FriendUpdateRequest;
 import com.relog.relog.friend.service.FriendService;
@@ -71,8 +70,7 @@ class FriendControllerTest {
                 .id(id)
                 .name(name)
                 .birthday(LocalDate.of(1995, 3, 10))
-                .groupId(null)
-                .groupName(null)
+                .score(0)
                 .build();
     }
 
@@ -112,27 +110,11 @@ class FriendControllerTest {
     }
 
     @Test
-    @DisplayName("그룹별 친구 목록 조회")
-    void getFriendsByGroup() throws Exception {
-        given(friendService.getFriendsByGroup(MEMBER_ID, 1L))
-                .willReturn(List.of(createFriendResponse(1L, "김친구")));
-
-        mockMvc.perform(get("/friends").param("groupId", "1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1));
-    }
-
-    @Test
     @DisplayName("친구 상세 조회")
     void getFriendDetail() throws Exception {
         FriendDetailResponse detailResponse = FriendDetailResponse.builder()
                 .friend(createFriendResponse(1L, "김친구"))
-                .relationshipScore(RelationshipScoreResponse.builder()
-                        .totalMeetings(5)
-                        .averageScore(4.2)
-                        .positiveCount(4)
-                        .negativeCount(0)
-                        .build())
+                .score(42)
                 .recentEvents(List.of())
                 .giftHistory(List.of())
                 .build();
@@ -142,8 +124,7 @@ class FriendControllerTest {
         mockMvc.perform(get("/friends/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.friend.name").value("김친구"))
-                .andExpect(jsonPath("$.data.relationshipScore.totalMeetings").value(5))
-                .andExpect(jsonPath("$.data.relationshipScore.averageScore").value(4.2));
+                .andExpect(jsonPath("$.data.score").value(42));
     }
 
     @Test
@@ -169,6 +150,7 @@ class FriendControllerTest {
                 .id(1L)
                 .name("김새친구")
                 .birthday(LocalDate.of(1995, 3, 10))
+                .score(0)
                 .build();
 
         given(friendService.updateFriend(eq(MEMBER_ID), eq(1L), any(FriendUpdateRequest.class)))

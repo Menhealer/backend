@@ -2,7 +2,6 @@ package com.relog.relog.gift.dto;
 
 import com.relog.relog.gift.entity.GiftDirection;
 import com.relog.relog.gift.entity.GiftType;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import lombok.Getter;
@@ -11,9 +10,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class GiftCreateRequest {
-
-    @NotBlank(message = "선물 이름은 필수입니다.")
-    private String itemName;
 
     private Integer price;
 

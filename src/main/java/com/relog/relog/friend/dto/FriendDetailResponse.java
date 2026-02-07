@@ -23,6 +23,7 @@ public class FriendDetailResponse {
         private String title;
         private String eventDate;
         private String reviewScore;
+        private String reviewText;
     }
 
     @Getter
@@ -30,10 +31,10 @@ public class FriendDetailResponse {
     @Builder
     public static class GiftSummaryResponse {
         private Long giftId;
-        private String itemName;
         private Integer price;
         private String giftDate;
         private String giftType;
         private String direction;
+        private String description;
     }
 }

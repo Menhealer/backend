@@ -15,6 +15,7 @@ import com.relog.relog.common.exception.GlobalExceptionHandler;
 import com.relog.relog.member.dto.MemberResponse;
 import com.relog.relog.member.dto.MemberUpdateRequest;
 import com.relog.relog.member.dto.ProfileImageResponse;
+import com.relog.relog.member.entity.SocialProvider;
 import com.relog.relog.member.service.MemberService;
 import java.time.LocalDate;
 import java.util.List;
@@ -69,10 +70,10 @@ class MemberControllerTest {
     void getMyInfo() throws Exception {
         MemberResponse response = MemberResponse.builder()
                 .id(MEMBER_ID)
-                .email("test@example.com")
                 .nickname("테스터")
                 .birthday(LocalDate.of(1995, 5, 15))
                 .profileImage(null)
+                .provider(SocialProvider.KAKAO)
                 .build();
 
         given(memberService.getMember(MEMBER_ID)).willReturn(response);
@@ -81,8 +82,8 @@ class MemberControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(MEMBER_ID))
-                .andExpect(jsonPath("$.data.email").value("test@example.com"))
-                .andExpect(jsonPath("$.data.nickname").value("테스터"));
+                .andExpect(jsonPath("$.data.nickname").value("테스터"))
+                .andExpect(jsonPath("$.data.provider").value("KAKAO"));
     }
 
     @Test
@@ -90,9 +91,9 @@ class MemberControllerTest {
     void updateMyInfo() throws Exception {
         MemberResponse response = MemberResponse.builder()
                 .id(MEMBER_ID)
-                .email("test@example.com")
                 .nickname("새닉네임")
                 .birthday(LocalDate.of(1995, 6, 20))
+                .provider(SocialProvider.KAKAO)
                 .build();
 
         given(memberService.updateMember(eq(MEMBER_ID), any(MemberUpdateRequest.class)))

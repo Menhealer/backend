@@ -37,9 +37,6 @@ public class Gift extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "item_name", length = 100, nullable = false)
-    private String itemName;
-
     @Column(name = "price")
     private Integer price;
 
@@ -64,10 +61,6 @@ public class Gift extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "friend_id", nullable = false)
     private Friend friend;
-
-    public void updateItemName(String itemName) {
-        this.itemName = itemName;
-    }
 
     public void updatePrice(Integer price) {
         this.price = price;

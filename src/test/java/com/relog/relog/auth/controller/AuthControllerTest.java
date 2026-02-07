@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.relog.relog.auth.dto.SocialLoginRequest;
+import com.relog.relog.auth.dto.SocialLoginResponse;
 import com.relog.relog.auth.dto.TokenResponse;
 import com.relog.relog.auth.exception.SocialAuthenticationException;
 import com.relog.relog.auth.service.AuthService;
@@ -65,12 +66,13 @@ class AuthControllerTest {
     @Test
     @DisplayName("소셜 로그인 성공")
     void socialLogin_success() throws Exception {
-        TokenResponse tokenResponse = TokenResponse.builder()
+        SocialLoginResponse loginResponse = SocialLoginResponse.builder()
+                .isNewMember(false)
                 .accessToken("access-token")
                 .refreshToken("refresh-token")
                 .build();
 
-        given(authService.socialLogin(any(SocialLoginRequest.class))).willReturn(tokenResponse);
+        given(authService.socialLogin(any(SocialLoginRequest.class))).willReturn(loginResponse);
 
         mockMvc.perform(post("/auth/social-login")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -156,6 +156,7 @@ public class FriendService {
                 .title(event.getTitle())
                 .eventDate(event.getEventDate().toString())
                 .reviewScore(getReviewScoreName(event.getReviewScore()))
+                .reviewText(event.getReviewText())
                 .build();
     }
 
@@ -177,11 +178,11 @@ public class FriendService {
     private GiftSummaryResponse toGiftSummary(Gift gift) {
         return GiftSummaryResponse.builder()
                 .giftId(gift.getId())
-                .itemName(gift.getItemName())
                 .price(gift.getPrice())
                 .giftDate(gift.getGiftDate().toString())
                 .giftType(gift.getGiftType().name())
                 .direction(gift.getDirection().name())
+                .description(gift.getDescription())
                 .build();
     }
 }

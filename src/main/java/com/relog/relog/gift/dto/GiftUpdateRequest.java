@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class GiftUpdateRequest {
 
-    private String itemName;
     private Integer price;
     private LocalDate giftDate;
     private GiftType giftType;

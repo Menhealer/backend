@@ -14,6 +14,7 @@ public class FriendResponse {
     private Long id;
     private String name;
     private LocalDate birthday;
+    private String group;
     private int score;
 
     public static FriendResponse from(Friend friend) {
@@ -21,6 +22,7 @@ public class FriendResponse {
                 .id(friend.getId())
                 .name(friend.getName())
                 .birthday(friend.getBirthday())
+                .group(friend.getGroup())
                 .score(friend.getScore())
                 .build();
     }

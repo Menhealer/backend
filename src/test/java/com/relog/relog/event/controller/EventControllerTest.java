@@ -102,18 +102,6 @@ class EventControllerTest {
     }
 
     @Test
-    @DisplayName("날짜별 이벤트 조회")
-    void getEventsByDate() throws Exception {
-        given(eventService.getEventsByDate(MEMBER_ID, LocalDate.of(2025, 3, 15)))
-                .willReturn(List.of(createEventResponse()));
-
-        mockMvc.perform(get("/events").param("date", "2025-03-15"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].title").value("점심 약속"));
-    }
-
-    @Test
     @DisplayName("이벤트 단건 조회")
     void getEvent() throws Exception {
         given(eventService.getEvent(MEMBER_ID, 1L)).willReturn(createEventResponse());

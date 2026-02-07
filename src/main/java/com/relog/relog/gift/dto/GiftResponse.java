@@ -14,7 +14,6 @@ import lombok.Getter;
 public class GiftResponse {
 
     private Long id;
-    private String itemName;
     private Integer price;
     private LocalDate giftDate;
     private GiftType giftType;
@@ -26,7 +25,6 @@ public class GiftResponse {
     public static GiftResponse from(Gift gift) {
         return GiftResponse.builder()
                 .id(gift.getId())
-                .itemName(gift.getItemName())
                 .price(gift.getPrice())
                 .giftDate(gift.getGiftDate())
                 .giftType(gift.getGiftType())
