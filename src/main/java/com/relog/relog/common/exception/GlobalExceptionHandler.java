@@ -3,6 +3,7 @@ package com.relog.relog.common.exception;
 import com.relog.relog.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +23,12 @@ public class GlobalExceptionHandler {
         String message = extractValidationMessage(e);
         log.warn("[ValidationException] {}", message);
         return ResponseEntity.badRequest().body(ApiResponse.error(message));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+        log.warn("[HttpMessageNotReadable] {}", e.getMessage());
+        return ResponseEntity.badRequest().body(ApiResponse.error("잘못된 요청 형식입니다."));
     }
 
     @ExceptionHandler(Exception.class)
