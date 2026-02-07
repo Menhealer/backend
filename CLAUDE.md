@@ -62,6 +62,11 @@ docker build -t relog-backend .
 - `application-prod.yml` — production config using environment variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET`, `JWT_ACCESS_EXPIRATION`, `JWT_REFRESH_EXPIRATION`, `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`
 - Production uses `ddl-auto: validate` (no auto-migration tool — schema must match entities)
 
+## Development Rules
+
+- **예외 케이스 및 검증:** 기능 및 요구사항을 구현할 때, 해당 기능에 대한 예외 케이스와 입력값 검증을 반드시 함께 구현한다. (잘못된 입력, 권한 없음, 존재하지 않는 리소스, 중복 등)
+- **보안:** 코드 작성 시 SQL Injection, XSS 등 OWASP 주요 보안 취약점에 항상 신경 써서 작성한다. 사용자 입력은 반드시 검증하고, 쿼리 파라미터는 파라미터 바인딩을 사용한다.
+
 ## CI/CD
 
 GitHub Actions (`.github/workflows/gradle.yml`): push/PR to `main`에서 트리거. Build → Docker build (linux/arm64) → Docker Hub push. Deploy는 push to main일 때만 실행 — SSH로 서버 접속 후 docker-compose pull/up.

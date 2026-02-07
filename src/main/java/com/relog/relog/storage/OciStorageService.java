@@ -6,11 +6,13 @@ import com.oracle.bmc.objectstorage.requests.CreatePreauthenticatedRequestReques
 import com.oracle.bmc.objectstorage.requests.DeleteObjectRequest;
 import com.oracle.bmc.objectstorage.requests.PutObjectRequest;
 import com.oracle.bmc.objectstorage.responses.CreatePreauthenticatedRequestResponse;
+import com.relog.relog.storage.exception.InvalidFileException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,8 +35,11 @@ public class OciStorageService {
     private String region;
 
     private static final String PROFILE_IMAGE_DIR = "profile-images/";
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp");
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     public String uploadProfileImage(Long memberId, MultipartFile file) throws IOException {
+        validateImageFile(file);
         String fileName = generateFileName(memberId, file.getOriginalFilename());
         String objectName = PROFILE_IMAGE_DIR + fileName;
 
@@ -100,6 +105,18 @@ public class OciStorageService {
             return null;
         }
         return url.substring(index + marker.length());
+    }
+
+    private void validateImageFile(MultipartFile file) {
+        String extension = extractExtension(file.getOriginalFilename()).toLowerCase();
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new InvalidFileException("허용되지 않는 파일 형식입니다. (jpg, jpeg, png, webp만 가능)");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new InvalidFileException("허용되지 않는 파일 타입입니다.");
+        }
     }
 
     private String generateFileName(Long memberId, String originalFilename) {
