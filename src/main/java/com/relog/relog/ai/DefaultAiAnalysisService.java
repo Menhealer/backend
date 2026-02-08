@@ -10,7 +10,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
-public class DefaultAiAnalysisService {
+public class DefaultAiAnalysisService implements AiAnalysisService {
 
     private static final double POSITIVE_THRESHOLD = 4.0;
 

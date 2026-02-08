@@ -7,6 +7,7 @@ import com.relog.relog.ai.dto.QuarterlyAnalysisResult;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -14,6 +15,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Slf4j
 @Service
 @Primary
+@ConditionalOnProperty(name = "ai.server.enabled", havingValue = "true")
 public class PythonAiAnalysisService implements AiAnalysisService {
 
     private final WebClient webClient;
