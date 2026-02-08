@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class GiftUpdateRequest {
 
+    private Long friendId;
     private Integer price;
     private LocalDate giftDate;
     private GiftType giftType;

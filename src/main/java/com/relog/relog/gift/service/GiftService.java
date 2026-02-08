@@ -75,6 +75,7 @@ public class GiftService {
     public GiftResponse updateGift(Long memberId, Long giftId, GiftUpdateRequest request) {
         Gift gift = findGiftByIdAndMemberId(giftId, memberId);
 
+        updateFriend(gift, request.getFriendId(), memberId);
         updatePrice(gift, request.getPrice());
         updateGiftDate(gift, request.getGiftDate());
         updateGiftType(gift, request.getGiftType());
@@ -103,6 +104,14 @@ public class GiftService {
     private Gift findGiftByIdAndMemberId(Long giftId, Long memberId) {
         return giftRepository.findByIdAndMemberId(giftId, memberId)
                 .orElseThrow(GiftNotFoundException::new);
+    }
+
+    private void updateFriend(Gift gift, Long friendId, Long memberId) {
+        if (friendId == null) {
+            return;
+        }
+        Friend friend = findFriendByIdAndMemberId(friendId, memberId);
+        gift.updateFriend(friend);
     }
 
     private void updatePrice(Gift gift, Integer price) {

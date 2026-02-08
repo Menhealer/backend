@@ -1,7 +1,9 @@
 package com.relog.relog.settlement.service;
 
 import com.relog.relog.ai.AiAnalysisService;
+import com.relog.relog.ai.dto.MonthlyAiRequest;
 import com.relog.relog.ai.dto.MonthlyAnalysisResult;
+import com.relog.relog.ai.dto.QuarterlyAiRequest;
 import com.relog.relog.ai.dto.QuarterlyAnalysisResult;
 import com.relog.relog.event.entity.Event;
 import com.relog.relog.event.repository.EventRepository;
@@ -18,6 +20,7 @@ import com.relog.relog.settlement.dto.QuarterlySettlementResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendMaintenanceResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendRankResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse.QuarterlySolutionResponse;
+import com.relog.relog.settlement.repository.SettlementCacheRepository;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -25,6 +28,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +42,7 @@ public class SettlementService {
     private final GiftRepository giftRepository;
     private final FriendRepository friendRepository;
     private final AiAnalysisService aiAnalysisService;
+    private final SettlementCacheRepository settlementCacheRepository;
 
     private static final int POSITIVE_THRESHOLD = 4;
     private static final int NEGATIVE_THRESHOLD = 2;
@@ -45,6 +50,11 @@ public class SettlementService {
     private static final int ATTENTION_DAYS_MIN = 90;
 
     public MonthlySettlementResponse getMonthlySettlement(Long memberId, int year, int month) {
+        Optional<MonthlySettlementResponse> cached = settlementCacheRepository.findMonthly(memberId, year, month);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
@@ -52,18 +62,30 @@ public class SettlementService {
         List<Gift> gifts = giftRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
 
         TopFriendResponse topFriend = findTopFriend(events);
-        MonthlyAnalysisResult aiResult = aiAnalysisService.analyzeMonthly(events, gifts);
+        SummaryResponse summary = calculateSummary(events, gifts);
 
-        return MonthlySettlementResponse.builder()
+        MonthlyAiRequest aiRequest = buildMonthlyAiRequest(topFriend, events, gifts, summary);
+        MonthlyAnalysisResult aiResult = aiAnalysisService.analyzeMonthly(aiRequest);
+
+        MonthlySettlementResponse response = MonthlySettlementResponse.builder()
                 .year(year)
                 .month(month)
-                .summary(calculateSummary(events, gifts))
+                .summary(summary)
                 .topFriend(topFriend)
                 .solution(toRelationshipSolution(aiResult))
                 .build();
+
+        settlementCacheRepository.saveMonthly(memberId, year, month, response);
+
+        return response;
     }
 
     public QuarterlySettlementResponse getQuarterlySettlement(Long memberId, int year, int quarter) {
+        Optional<QuarterlySettlementResponse> cached = settlementCacheRepository.findQuarterly(memberId, year, quarter);
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+
         LocalDate startDate = LocalDate.of(year, (quarter - 1) * 3 + 1, 1);
         LocalDate endDate = startDate.plusMonths(3).minusDays(1);
 
@@ -72,16 +94,165 @@ public class SettlementService {
 
         List<FriendRankResponse> bestFriends = findBestFriends(events, 5);
         List<FriendRankResponse> worstFriends = findWorstFriends(events, 5);
-        QuarterlyAnalysisResult aiResult = aiAnalysisService.analyzeQuarterly(events, allFriends);
+        List<FriendMaintenanceResponse> friendsToMaintain = findFriendsToMaintain(allFriends, events);
+        List<FriendMaintenanceResponse> friendsNeedingAttention = findFriendsNeedingAttention(allFriends, events);
 
-        return QuarterlySettlementResponse.builder()
+        QuarterlyAiRequest aiRequest = buildQuarterlyAiRequest(
+                year, quarter, events, bestFriends, worstFriends, friendsToMaintain, friendsNeedingAttention);
+        QuarterlyAnalysisResult aiResult = aiAnalysisService.analyzeQuarterly(aiRequest);
+
+        QuarterlySettlementResponse response = QuarterlySettlementResponse.builder()
                 .year(year)
                 .quarter(quarter)
                 .bestFriends(bestFriends)
                 .worstFriends(worstFriends)
-                .friendsToMaintain(findFriendsToMaintain(allFriends, events))
-                .friendsNeedingAttention(findFriendsNeedingAttention(allFriends, events))
+                .friendsToMaintain(friendsToMaintain)
+                .friendsNeedingAttention(friendsNeedingAttention)
                 .solution(toQuarterlySolution(aiResult))
+                .build();
+
+        settlementCacheRepository.saveQuarterly(memberId, year, quarter, response);
+
+        return response;
+    }
+
+    private MonthlyAiRequest buildMonthlyAiRequest(
+            TopFriendResponse topFriend, List<Event> events, List<Gift> gifts, SummaryResponse summary) {
+
+        MonthlyAiRequest.SummaryData summaryData = MonthlyAiRequest.SummaryData.builder()
+                .totalMeetings(summary.getTotalMeetings())
+                .positiveMeetings(summary.getPositiveMeetings())
+                .negativeMeetings(summary.getNegativeMeetings())
+                .averageScore(summary.getAverageScore())
+                .totalGiftsGiven(summary.getTotalGiftsGiven())
+                .totalGiftsReceived(summary.getTotalGiftsReceived())
+                .totalAmountGiven(summary.getTotalAmountGiven())
+                .totalAmountReceived(summary.getTotalAmountReceived())
+                .build();
+
+        if (topFriend == null) {
+            return MonthlyAiRequest.builder()
+                    .friendName(null)
+                    .events(List.of())
+                    .gifts(List.of())
+                    .summary(summaryData)
+                    .build();
+        }
+
+        Long topFriendId = topFriend.getFriendId();
+
+        List<MonthlyAiRequest.EventData> eventDataList = events.stream()
+                .filter(e -> e.getFriend().getId().equals(topFriendId))
+                .map(e -> MonthlyAiRequest.EventData.builder()
+                        .eventDate(e.getEventDate())
+                        .reviewScore(e.getReviewScore() != null ? e.getReviewScore().getScore() : 0)
+                        .reviewText(e.getReviewText())
+                        .build())
+                .toList();
+
+        List<MonthlyAiRequest.GiftData> giftDataList = gifts.stream()
+                .filter(g -> g.getFriend().getId().equals(topFriendId))
+                .map(g -> MonthlyAiRequest.GiftData.builder()
+                        .giftDate(g.getGiftDate())
+                        .giftType(g.getGiftType().name())
+                        .direction(g.getDirection().name())
+                        .price(g.getPrice())
+                        .description(g.getDescription())
+                        .build())
+                .toList();
+
+        return MonthlyAiRequest.builder()
+                .friendName(topFriend.getFriendName())
+                .events(eventDataList)
+                .gifts(giftDataList)
+                .summary(summaryData)
+                .build();
+    }
+
+    private QuarterlyAiRequest buildQuarterlyAiRequest(
+            int year, int quarter, List<Event> events,
+            List<FriendRankResponse> bestFriends, List<FriendRankResponse> worstFriends,
+            List<FriendMaintenanceResponse> friendsToMaintain,
+            List<FriendMaintenanceResponse> friendsNeedingAttention) {
+
+        int startMonth = (quarter - 1) * 3 + 1;
+        List<QuarterlyAiRequest.MonthlySummaryData> monthlySummaries = new ArrayList<>();
+
+        for (int m = startMonth; m < startMonth + 3; m++) {
+            int month = m;
+            List<Event> monthEvents = events.stream()
+                    .filter(e -> e.getEventDate().getMonthValue() == month)
+                    .toList();
+
+            int positive = 0;
+            int negative = 0;
+            int totalScore = 0;
+            int scoredCount = 0;
+
+            for (Event event : monthEvents) {
+                if (event.getReviewScore() == null) {
+                    continue;
+                }
+                int score = event.getReviewScore().getScore();
+                totalScore += score;
+                scoredCount++;
+                positive += countIfPositive(score);
+                negative += countIfNegative(score);
+            }
+
+            monthlySummaries.add(QuarterlyAiRequest.MonthlySummaryData.builder()
+                    .month(month)
+                    .totalMeetings(monthEvents.size())
+                    .positiveMeetings(positive)
+                    .negativeMeetings(negative)
+                    .averageScore(calculateAverage(totalScore, scoredCount))
+                    .build());
+        }
+
+        List<QuarterlyAiRequest.FriendRankData> bestFriendData = bestFriends.stream()
+                .map(f -> QuarterlyAiRequest.FriendRankData.builder()
+                        .friendName(f.getFriendName())
+                        .meetingCount(f.getMeetingCount())
+                        .averageScore(f.getAverageScore())
+                        .positiveCount(f.getPositiveCount())
+                        .negativeCount(f.getNegativeCount())
+                        .build())
+                .toList();
+
+        List<QuarterlyAiRequest.FriendRankData> worstFriendData = worstFriends.stream()
+                .map(f -> QuarterlyAiRequest.FriendRankData.builder()
+                        .friendName(f.getFriendName())
+                        .meetingCount(f.getMeetingCount())
+                        .averageScore(f.getAverageScore())
+                        .positiveCount(f.getPositiveCount())
+                        .negativeCount(f.getNegativeCount())
+                        .build())
+                .toList();
+
+        List<QuarterlyAiRequest.FriendMaintenanceData> maintainData = friendsToMaintain.stream()
+                .map(f -> QuarterlyAiRequest.FriendMaintenanceData.builder()
+                        .friendName(f.getFriendName())
+                        .daysSinceLastMeeting(f.getDaysSinceLastMeeting())
+                        .recommendation(f.getRecommendation())
+                        .build())
+                .toList();
+
+        List<QuarterlyAiRequest.FriendMaintenanceData> attentionData = friendsNeedingAttention.stream()
+                .map(f -> QuarterlyAiRequest.FriendMaintenanceData.builder()
+                        .friendName(f.getFriendName())
+                        .daysSinceLastMeeting(f.getDaysSinceLastMeeting())
+                        .recommendation(f.getRecommendation())
+                        .build())
+                .toList();
+
+        return QuarterlyAiRequest.builder()
+                .year(year)
+                .quarter(quarter)
+                .monthlySummaries(monthlySummaries)
+                .bestFriends(bestFriendData)
+                .worstFriends(worstFriendData)
+                .friendsToMaintain(maintainData)
+                .friendsNeedingAttention(attentionData)
                 .build();
     }
 

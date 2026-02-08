@@ -1,43 +1,36 @@
 package com.relog.relog.ai;
 
+import com.relog.relog.ai.dto.MonthlyAiRequest;
 import com.relog.relog.ai.dto.MonthlyAnalysisResult;
+import com.relog.relog.ai.dto.QuarterlyAiRequest;
+import com.relog.relog.ai.dto.QuarterlyAiRequest.FriendRankData;
 import com.relog.relog.ai.dto.QuarterlyAnalysisResult;
-import com.relog.relog.event.entity.Event;
-import com.relog.relog.friend.entity.Friend;
-import com.relog.relog.gift.entity.Gift;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
-public class DefaultAiAnalysisService implements AiAnalysisService {
+@Component
+public class DefaultAiAnalysisService {
 
-    private static final int POSITIVE_THRESHOLD = 4;
+    private static final double POSITIVE_THRESHOLD = 4.0;
 
-    @Override
-    public MonthlyAnalysisResult analyzeMonthly(List<Event> events, List<Gift> gifts) {
-        if (events.isEmpty()) {
+    public MonthlyAnalysisResult analyzeMonthly(MonthlyAiRequest request) {
+        if (request.getFriendName() == null || request.getEvents().isEmpty()) {
             return createEmptyMonthlyResult();
         }
 
-        TopFriendInfo topFriend = findTopFriend(events);
-        if (topFriend == null) {
-            return createEmptyMonthlyResult();
-        }
-
-        return createMonthlyResultByScore(topFriend);
+        return createMonthlyResultByScore(request.getFriendName(), request.getSummary().getAverageScore());
     }
 
-    @Override
-    public QuarterlyAnalysisResult analyzeQuarterly(List<Event> events, List<Friend> friends) {
-        Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
+    public QuarterlyAnalysisResult analyzeQuarterly(QuarterlyAiRequest request) {
+        int totalMeetings = request.getMonthlySummaries().stream()
+                .mapToInt(QuarterlyAiRequest.MonthlySummaryData::getTotalMeetings)
+                .sum();
 
-        List<String> positiveInsights = buildPositiveInsights(eventsByFriend);
-        List<String> negativeInsights = buildNegativeInsights(eventsByFriend);
-        List<String> actionItems = buildActionItems(events, eventsByFriend);
-        String overallAnalysis = buildOverallAnalysis(events.size());
+        List<String> positiveInsights = buildPositiveInsights(request.getBestFriends());
+        List<String> negativeInsights = buildNegativeInsights(request.getWorstFriends());
+        List<String> actionItems = buildActionItems(totalMeetings, request.getWorstFriends());
+        String overallAnalysis = buildOverallAnalysis(totalMeetings);
 
         return QuarterlyAnalysisResult.builder()
                 .overallAnalysis(overallAnalysis)
@@ -55,14 +48,11 @@ public class DefaultAiAnalysisService implements AiAnalysisService {
                 .build();
     }
 
-    private MonthlyAnalysisResult createMonthlyResultByScore(TopFriendInfo topFriend) {
-        double score = topFriend.averageScore;
-        String friendName = topFriend.friendName;
-
-        if (score >= 4.0) {
+    private MonthlyAnalysisResult createMonthlyResultByScore(String friendName, double averageScore) {
+        if (averageScore >= 4.0) {
             return createPositiveResult(friendName);
         }
-        if (score >= 3.0) {
+        if (averageScore >= 3.0) {
             return createNeutralResult(friendName);
         }
         return createNegativeResult(friendName);
@@ -92,59 +82,6 @@ public class DefaultAiAnalysisService implements AiAnalysisService {
                 .build();
     }
 
-    private TopFriendInfo findTopFriend(List<Event> events) {
-        Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
-
-        Long topFriendId = null;
-        int maxCount = 0;
-
-        for (Map.Entry<Long, List<Event>> entry : eventsByFriend.entrySet()) {
-            if (entry.getValue().size() <= maxCount) {
-                continue;
-            }
-            maxCount = entry.getValue().size();
-            topFriendId = entry.getKey();
-        }
-
-        if (topFriendId == null) {
-            return null;
-        }
-
-        List<Event> topFriendEvents = eventsByFriend.get(topFriendId);
-        String friendName = topFriendEvents.get(0).getFriend().getName();
-        double averageScore = calculateAverageScore(topFriendEvents);
-
-        return new TopFriendInfo(topFriendId, friendName, maxCount, averageScore);
-    }
-
-    private Map<Long, List<Event>> groupEventsByFriend(List<Event> events) {
-        Map<Long, List<Event>> result = new HashMap<>();
-
-        for (Event event : events) {
-            result.computeIfAbsent(event.getFriend().getId(), k -> new ArrayList<>()).add(event);
-        }
-
-        return result;
-    }
-
-    private double calculateAverageScore(List<Event> events) {
-        int totalScore = 0;
-        int count = 0;
-
-        for (Event event : events) {
-            if (event.getReviewScore() == null) {
-                continue;
-            }
-            totalScore += event.getReviewScore().getScore();
-            count++;
-        }
-
-        if (count == 0) {
-            return 0.0;
-        }
-        return (double) totalScore / count;
-    }
-
     private String buildOverallAnalysis(int totalMeetings) {
         if (totalMeetings == 0) {
             return "이번 분기 만남 기록이 없습니다.";
@@ -155,54 +92,46 @@ public class DefaultAiAnalysisService implements AiAnalysisService {
         return "이번 분기 활발한 교류가 있었습니다.";
     }
 
-    private List<String> buildPositiveInsights(Map<Long, List<Event>> eventsByFriend) {
+    private List<String> buildPositiveInsights(List<FriendRankData> bestFriends) {
         List<String> insights = new ArrayList<>();
 
-        for (List<Event> friendEvents : eventsByFriend.values()) {
-            double avgScore = calculateAverageScore(friendEvents);
-            if (avgScore < POSITIVE_THRESHOLD) {
+        for (FriendRankData friend : bestFriends) {
+            if (friend.getAverageScore() < POSITIVE_THRESHOLD) {
                 continue;
             }
-            String friendName = friendEvents.get(0).getFriend().getName();
-            insights.add(friendName + "님과 좋은 관계를 유지하고 있습니다.");
+            insights.add(friend.getFriendName() + "님과 좋은 관계를 유지하고 있습니다.");
         }
 
         return insights;
     }
 
-    private List<String> buildNegativeInsights(Map<Long, List<Event>> eventsByFriend) {
+    private List<String> buildNegativeInsights(List<FriendRankData> worstFriends) {
         List<String> insights = new ArrayList<>();
 
-        for (List<Event> friendEvents : eventsByFriend.values()) {
-            double avgScore = calculateAverageScore(friendEvents);
-            if (avgScore >= 3.0 || avgScore <= 0) {
+        for (FriendRankData friend : worstFriends) {
+            if (friend.getAverageScore() >= 3.0 || friend.getAverageScore() <= 0) {
                 continue;
             }
-            String friendName = friendEvents.get(0).getFriend().getName();
-            insights.add(friendName + "님과의 관계 개선이 필요합니다.");
+            insights.add(friend.getFriendName() + "님과의 관계 개선이 필요합니다.");
         }
 
         return insights;
     }
 
-    private List<String> buildActionItems(List<Event> events, Map<Long, List<Event>> eventsByFriend) {
+    private List<String> buildActionItems(int totalMeetings, List<FriendRankData> worstFriends) {
         List<String> actionItems = new ArrayList<>();
 
-        if (events.isEmpty()) {
+        if (totalMeetings == 0) {
             actionItems.add("친구들과의 만남을 계획해보세요.");
         }
 
-        for (List<Event> friendEvents : eventsByFriend.values()) {
-            double avgScore = calculateAverageScore(friendEvents);
-            if (avgScore >= 3.0 || avgScore <= 0) {
+        for (FriendRankData friend : worstFriends) {
+            if (friend.getAverageScore() >= 3.0 || friend.getAverageScore() <= 0) {
                 continue;
             }
-            String friendName = friendEvents.get(0).getFriend().getName();
-            actionItems.add(friendName + "님과 솔직한 대화를 나눠보세요.");
+            actionItems.add(friend.getFriendName() + "님과 솔직한 대화를 나눠보세요.");
         }
 
         return actionItems;
     }
-
-    private record TopFriendInfo(Long friendId, String friendName, int meetingCount, double averageScore) {}
 }
