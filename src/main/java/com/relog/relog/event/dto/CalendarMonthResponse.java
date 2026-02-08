@@ -1,5 +1,6 @@
 package com.relog.relog.event.dto;
 
+import com.relog.relog.friend.dto.FriendResponse;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -21,15 +22,6 @@ public class CalendarMonthResponse {
     public static class CalendarDayResponse {
         private LocalDate date;
         private List<EventResponse> events;
-        private List<BirthdayResponse> birthdays;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    @Builder
-    public static class BirthdayResponse {
-        private Long friendId;
-        private String friendName;
-        private boolean isMemberBirthday;
+        private List<FriendResponse> birthdays;
     }
 }

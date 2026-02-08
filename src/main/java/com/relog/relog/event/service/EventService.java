@@ -1,8 +1,8 @@
 package com.relog.relog.event.service;
 
 import com.relog.relog.event.dto.CalendarMonthResponse;
-import com.relog.relog.event.dto.CalendarMonthResponse.BirthdayResponse;
 import com.relog.relog.event.dto.CalendarMonthResponse.CalendarDayResponse;
+import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.event.dto.EventCreateRequest;
 import com.relog.relog.event.dto.EventResponse;
 import com.relog.relog.event.dto.EventUpdateRequest;
@@ -141,7 +141,7 @@ public class EventService {
         for (int day = 1; day <= yearMonth.lengthOfMonth(); day++) {
             LocalDate date = yearMonth.atDay(day);
             List<EventResponse> dayEvents = getDayEvents(eventsByDate, date);
-            List<BirthdayResponse> birthdays = getBirthdaysForDate(member, friends, date);
+            List<FriendResponse> birthdays = getBirthdaysForDate(member, friends, date);
 
             days.add(CalendarDayResponse.builder()
                     .date(date)
@@ -159,8 +159,8 @@ public class EventService {
                 .toList();
     }
 
-    private List<BirthdayResponse> getBirthdaysForDate(RelogMember member, List<Friend> friends, LocalDate date) {
-        List<BirthdayResponse> birthdays = new ArrayList<>();
+    private List<FriendResponse> getBirthdaysForDate(RelogMember member, List<Friend> friends, LocalDate date) {
+        List<FriendResponse> birthdays = new ArrayList<>();
 
         addMemberBirthdayIfMatch(birthdays, member, date);
         addFriendBirthdaysIfMatch(birthdays, friends, date);
@@ -168,27 +168,25 @@ public class EventService {
         return birthdays;
     }
 
-    private void addMemberBirthdayIfMatch(List<BirthdayResponse> birthdays, RelogMember member, LocalDate date) {
+    private void addMemberBirthdayIfMatch(List<FriendResponse> birthdays, RelogMember member, LocalDate date) {
         if (!isBirthdayMatch(member.getBirthday(), date)) {
             return;
         }
-        birthdays.add(BirthdayResponse.builder()
-                .friendId(null)
-                .friendName(member.getNickname())
-                .isMemberBirthday(true)
+        birthdays.add(FriendResponse.builder()
+                .id(null)
+                .name(member.getNickname())
+                .birthday(member.getBirthday())
+                .group(null)
+                .score(0)
                 .build());
     }
 
-    private void addFriendBirthdaysIfMatch(List<BirthdayResponse> birthdays, List<Friend> friends, LocalDate date) {
+    private void addFriendBirthdaysIfMatch(List<FriendResponse> birthdays, List<Friend> friends, LocalDate date) {
         for (Friend friend : friends) {
             if (!isBirthdayMatch(friend.getBirthday(), date)) {
                 continue;
             }
-            birthdays.add(BirthdayResponse.builder()
-                    .friendId(friend.getId())
-                    .friendName(friend.getName())
-                    .isMemberBirthday(false)
-                    .build());
+            birthdays.add(FriendResponse.from(friend));
         }
     }
 
