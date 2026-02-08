@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,12 +45,19 @@ public class SettlementService {
     private final AiAnalysisService aiAnalysisService;
     private final SettlementCacheRepository settlementCacheRepository;
 
+    @Value("${settlement.mock-enabled:false}")
+    private boolean mockEnabled;
+
     private static final int POSITIVE_THRESHOLD = 4;
     private static final int NEGATIVE_THRESHOLD = 2;
     private static final int MAINTAIN_DAYS_MIN = 30;
     private static final int ATTENTION_DAYS_MIN = 90;
 
     public MonthlySettlementResponse getMonthlySettlement(Long memberId, int year, int month) {
+        if (mockEnabled) {
+            return createMockMonthlyResponse(year, month);
+        }
+
         Optional<MonthlySettlementResponse> cached = settlementCacheRepository.findMonthly(memberId, year, month);
         if (cached.isPresent()) {
             return cached.get();
@@ -81,6 +89,10 @@ public class SettlementService {
     }
 
     public QuarterlySettlementResponse getQuarterlySettlement(Long memberId, int year, int quarter) {
+        if (mockEnabled) {
+            return createMockQuarterlyResponse(year, quarter);
+        }
+
         Optional<QuarterlySettlementResponse> cached = settlementCacheRepository.findQuarterly(memberId, year, quarter);
         if (cached.isPresent()) {
             return cached.get();
@@ -525,6 +537,105 @@ public class SettlementService {
             return 0.0;
         }
         return (double) total / count;
+    }
+
+    private MonthlySettlementResponse createMockMonthlyResponse(int year, int month) {
+        SummaryResponse summary = SummaryResponse.builder()
+                .totalMeetings(12)
+                .positiveMeetings(8)
+                .negativeMeetings(2)
+                .averageScore(3.8)
+                .totalGiftsGiven(3)
+                .totalGiftsReceived(2)
+                .totalAmountGiven(150000)
+                .totalAmountReceived(80000)
+                .build();
+
+        TopFriendResponse topFriend = TopFriendResponse.builder()
+                .friendId(1L)
+                .friendName("김민수")
+                .meetingCount(5)
+                .averageScore(4.2)
+                .build();
+
+        RelationshipSolutionResponse solution = RelationshipSolutionResponse.builder()
+                .friendName("김민수")
+                .analysis("김민수님과의 관계가 매우 좋습니다. 이번 달 5회 만남을 가졌으며 평균 만족도가 높습니다.")
+                .suggestions(List.of(
+                        "이 관계를 계속 유지하세요.",
+                        "특별한 날에 선물을 준비해보세요.",
+                        "함께 새로운 활동을 시도해보세요."))
+                .build();
+
+        return MonthlySettlementResponse.builder()
+                .year(year)
+                .month(month)
+                .summary(summary)
+                .topFriend(topFriend)
+                .solution(solution)
+                .build();
+    }
+
+    private QuarterlySettlementResponse createMockQuarterlyResponse(int year, int quarter) {
+        List<FriendRankResponse> bestFriends = List.of(
+                FriendRankResponse.builder()
+                        .friendId(1L).friendName("김민수")
+                        .meetingCount(14).averageScore(4.5).positiveCount(12).negativeCount(0).build(),
+                FriendRankResponse.builder()
+                        .friendId(2L).friendName("이서연")
+                        .meetingCount(10).averageScore(4.2).positiveCount(8).negativeCount(1).build(),
+                FriendRankResponse.builder()
+                        .friendId(3L).friendName("박지훈")
+                        .meetingCount(8).averageScore(4.0).positiveCount(6).negativeCount(1).build());
+
+        List<FriendRankResponse> worstFriends = List.of(
+                FriendRankResponse.builder()
+                        .friendId(4L).friendName("최예진")
+                        .meetingCount(3).averageScore(2.0).positiveCount(0).negativeCount(2).build(),
+                FriendRankResponse.builder()
+                        .friendId(5L).friendName("정도윤")
+                        .meetingCount(2).averageScore(2.5).positiveCount(0).negativeCount(1).build());
+
+        List<FriendMaintenanceResponse> friendsToMaintain = List.of(
+                FriendMaintenanceResponse.builder()
+                        .friendId(6L).friendName("한소희")
+                        .daysSinceLastMeeting(45).recommendation("오랜 기간 유지하면 좋은 관계입니다.").build(),
+                FriendMaintenanceResponse.builder()
+                        .friendId(7L).friendName("윤재호")
+                        .daysSinceLastMeeting(60).recommendation("오랜 기간 유지하면 좋은 관계입니다.").build());
+
+        List<FriendMaintenanceResponse> friendsNeedingAttention = List.of(
+                FriendMaintenanceResponse.builder()
+                        .friendId(8L).friendName("송하늘")
+                        .daysSinceLastMeeting(120).recommendation("기간 내로 정리가 필요한 관계입니다.").build(),
+                FriendMaintenanceResponse.builder()
+                        .friendId(9L).friendName("오민재")
+                        .daysSinceLastMeeting(-1).recommendation("만남 기록이 없습니다. 연락해보세요.").build());
+
+        QuarterlySolutionResponse solution = QuarterlySolutionResponse.builder()
+                .overallAnalysis("이번 분기 총 37회의 만남이 있었으며 전반적으로 활발한 교류가 있었습니다.")
+                .positiveInsights(List.of(
+                        "김민수님과 매우 좋은 관계를 유지하고 있습니다.",
+                        "이서연님과의 만남 만족도가 높습니다.",
+                        "박지훈님과 꾸준한 만남을 이어가고 있습니다."))
+                .negativeInsights(List.of(
+                        "최예진님과의 관계 개선이 필요합니다.",
+                        "정도윤님과의 만남 빈도가 낮고 만족도가 떨어집니다."))
+                .actionItems(List.of(
+                        "최예진님과 솔직한 대화를 나눠보세요.",
+                        "송하늘님에게 연락을 해보세요.",
+                        "오민재님과 첫 만남을 계획해보세요."))
+                .build();
+
+        return QuarterlySettlementResponse.builder()
+                .year(year)
+                .quarter(quarter)
+                .bestFriends(bestFriends)
+                .worstFriends(worstFriends)
+                .friendsToMaintain(friendsToMaintain)
+                .friendsNeedingAttention(friendsNeedingAttention)
+                .solution(solution)
+                .build();
     }
 
     private record GiftSummary(int givenCount, int receivedCount, long givenAmount, long receivedAmount) {}
