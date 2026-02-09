@@ -220,9 +220,11 @@ public class EventService {
     }
 
     private void updateEventReview(Event event, EventUpdateRequest request) {
-        if (request.getReviewScore() == null && request.getReviewText() == null) {
-            return;
+        if (request.getReviewScore() != null) {
+            event.updateReviewScore(request.getReviewScore());
         }
-        event.updateReview(request.getReviewScore(), request.getReviewText());
+        if (request.getReviewText() != null) {
+            event.updateReviewText(request.getReviewText());
+        }
     }
 }

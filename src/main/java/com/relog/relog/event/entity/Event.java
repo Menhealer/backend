@@ -66,8 +66,11 @@ public class Event extends BaseEntity {
         this.eventDate = eventDate;
     }
 
-    public void updateReview(ReviewScore reviewScore, String reviewText) {
+    public void updateReviewScore(ReviewScore reviewScore) {
         this.reviewScore = reviewScore;
+    }
+
+    public void updateReviewText(String reviewText) {
         this.reviewText = reviewText;
     }
 
