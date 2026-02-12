@@ -56,10 +56,4 @@ public class MemberController {
         return ResponseEntity.ok(ApiResponse.success());
     }
 
-    @DeleteMapping("/me")
-    public ResponseEntity<ApiResponse<Void>> deleteMyAccount(
-            @AuthenticationPrincipal Long memberId) {
-        memberService.deleteMember(memberId);
-        return ResponseEntity.ok(ApiResponse.success());
-    }
 }

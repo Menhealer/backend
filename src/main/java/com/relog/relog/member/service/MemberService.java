@@ -9,6 +9,8 @@ import com.relog.relog.member.repository.RelogMemberRepository;
 import com.relog.relog.storage.OciStorageService;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class MemberService {
 
     private final RelogMemberRepository memberRepository;
-    private final OciStorageService ociStorageService;
+    private final Optional<OciStorageService> ociStorageService;
 
     public MemberResponse getMember(Long memberId) {
         RelogMember member = findMemberById(memberId);
@@ -33,6 +35,7 @@ public class MemberService {
 
         updateNickname(member, request.getNickname());
         updateBirthday(member, request.getBirthday());
+        updateBirthTime(member, request.getBirthTime());
 
         return MemberResponse.from(member);
     }
@@ -43,7 +46,9 @@ public class MemberService {
 
         deleteExistingProfileImage(member);
 
-        String imageUrl = ociStorageService.uploadProfileImage(memberId, file);
+        String imageUrl = ociStorageService
+                .orElseThrow(() -> new UnsupportedOperationException("파일 업로드 서비스가 비활성화 상태입니다."))
+                .uploadProfileImage(memberId, file);
         member.updateProfileImage(imageUrl);
 
         return new ProfileImageResponse(imageUrl);
@@ -57,14 +62,6 @@ public class MemberService {
         member.updateProfileImage(null);
     }
 
-    @Transactional
-    public void deleteMember(Long memberId) {
-        RelogMember member = findMemberById(memberId);
-
-        deleteExistingProfileImage(member);
-        memberRepository.delete(member);
-    }
-
     private RelogMember findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
@@ -74,7 +71,7 @@ public class MemberService {
         if (member.getProfileImage() == null) {
             return;
         }
-        ociStorageService.deleteProfileImage(member.getProfileImage());
+        ociStorageService.ifPresent(service -> service.deleteProfileImage(member.getProfileImage()));
     }
 
     private void updateNickname(RelogMember member, String nickname) {
@@ -89,5 +86,12 @@ public class MemberService {
             return;
         }
         member.updateBirthday(birthday);
+    }
+
+    private void updateBirthTime(RelogMember member, LocalTime birthTime) {
+        if (birthTime == null) {
+            return;
+        }
+        member.updateBirthTime(birthTime);
     }
 }

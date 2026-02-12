@@ -5,30 +5,45 @@ import com.relog.relog.auth.dto.SocialLoginResponse;
 import com.relog.relog.auth.dto.SocialSignUpRequest;
 import com.relog.relog.auth.dto.SocialUserInfo;
 import com.relog.relog.auth.dto.TokenResponse;
+import com.relog.relog.auth.dto.WithdrawRequest;
 import com.relog.relog.auth.exception.InvalidTokenException;
 import com.relog.relog.auth.exception.SocialAuthenticationException;
+import com.relog.relog.auth.social.AppleTokenRevokeService;
 import com.relog.relog.auth.social.SocialAuthClient;
 import com.relog.relog.auth.social.SocialAuthClientFactory;
+import com.relog.relog.event.repository.EventRepository;
+import com.relog.relog.friend.repository.FriendRepository;
+import com.relog.relog.gift.repository.GiftRepository;
 import com.relog.relog.jwt.JwtType;
 import com.relog.relog.jwt.JwtUtil;
 import com.relog.relog.jwt.TokenGenerator;
 import com.relog.relog.member.dto.MemberResponse;
 import com.relog.relog.member.entity.RelogMember;
 import com.relog.relog.member.entity.SocialProvider;
+import com.relog.relog.member.exception.MemberNotFoundException;
 import com.relog.relog.member.repository.RelogMemberRepository;
+import com.relog.relog.storage.OciStorageService;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AuthService {
 
     private final RelogMemberRepository memberRepository;
+    private final FriendRepository friendRepository;
+    private final EventRepository eventRepository;
+    private final GiftRepository giftRepository;
     private final TokenGenerator tokenGenerator;
     private final JwtUtil jwtUtil;
     private final SocialAuthClientFactory socialAuthClientFactory;
+    private final AppleTokenRevokeService appleTokenRevokeService;
+    private final Optional<OciStorageService> ociStorageService;
 
     public SocialLoginResponse socialLogin(SocialLoginRequest request) {
         SocialProvider provider = parseProvider(request.getProvider());
@@ -95,6 +110,51 @@ public class AuthService {
 
     public void logout(Long memberId) {
         tokenGenerator.invalidateRefreshToken(memberId);
+    }
+
+    @Transactional
+    public void withdraw(Long memberId, WithdrawRequest request) {
+        RelogMember member = memberRepository.findById(memberId)
+                .orElseThrow(MemberNotFoundException::new);
+
+        SocialProvider provider = parseProvider(request.getProvider());
+        validateProviderMatch(member, provider);
+
+        if (provider == SocialProvider.APPLE) {
+            revokeAppleToken(request.getAuthorizationCode());
+        }
+
+        deleteProfileImage(member);
+        giftRepository.deleteAll(giftRepository.findAllByMemberId(memberId));
+        eventRepository.deleteAll(eventRepository.findAllByMemberId(memberId));
+        friendRepository.deleteAll(friendRepository.findAllByMemberId(memberId));
+        memberRepository.delete(member);
+        tokenGenerator.invalidateRefreshToken(memberId);
+    }
+
+    private void validateProviderMatch(RelogMember member, SocialProvider provider) {
+        if (member.getProvider() != provider) {
+            throw new SocialAuthenticationException("가입한 소셜 로그인 제공자와 일치하지 않습니다.");
+        }
+    }
+
+    private void revokeAppleToken(String authorizationCode) {
+        if (authorizationCode == null || authorizationCode.isBlank()) {
+            throw new SocialAuthenticationException("Apple 탈퇴에는 authorizationCode가 필수입니다.");
+        }
+        try {
+            appleTokenRevokeService.revokeToken(authorizationCode);
+        } catch (Exception e) {
+            log.error("[Apple] Token revoke 실패: {}", e.getMessage());
+            throw new SocialAuthenticationException("Apple 토큰 해제에 실패했습니다.");
+        }
+    }
+
+    private void deleteProfileImage(RelogMember member) {
+        if (member.getProfileImage() == null) {
+            return;
+        }
+        ociStorageService.ifPresent(service -> service.deleteProfileImage(member.getProfileImage()));
     }
 
     private SocialProvider parseProvider(String provider) {

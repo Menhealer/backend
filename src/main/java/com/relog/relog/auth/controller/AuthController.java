@@ -5,6 +5,7 @@ import com.relog.relog.auth.dto.SocialLoginResponse;
 import com.relog.relog.auth.dto.SocialSignUpRequest;
 import com.relog.relog.auth.dto.TokenRefreshRequest;
 import com.relog.relog.auth.dto.TokenResponse;
+import com.relog.relog.auth.dto.WithdrawRequest;
 import com.relog.relog.auth.service.AuthService;
 import com.relog.relog.common.ApiResponse;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -48,6 +50,14 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@AuthenticationPrincipal Long memberId) {
         authService.logout(memberId);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<ApiResponse<Void>> withdraw(
+            @AuthenticationPrincipal Long memberId,
+            @Valid @RequestBody WithdrawRequest request) {
+        authService.withdraw(memberId, request);
         return ResponseEntity.ok(ApiResponse.success());
     }
 }

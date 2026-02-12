@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -48,6 +49,9 @@ public class RelogMember extends BaseEntity {
     @Column(name = "birthday")
     private LocalDate birthday;
 
+    @Column(name = "birth_time")
+    private LocalTime birthTime;
+
     @Column(name = "profile_image", length = 500)
     private String profileImage;
 
@@ -57,6 +61,10 @@ public class RelogMember extends BaseEntity {
 
     public void updateBirthday(LocalDate birthday) {
         this.birthday = birthday;
+    }
+
+    public void updateBirthTime(LocalTime birthTime) {
+        this.birthTime = birthTime;
     }
 
     public void updateProfileImage(String profileImage) {
