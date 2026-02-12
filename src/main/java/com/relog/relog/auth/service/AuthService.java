@@ -50,6 +50,7 @@ public class AuthService {
         SocialAuthClient client = socialAuthClientFactory.getClient(provider);
         SocialUserInfo userInfo = client.getUserInfo(request.getToken());
 
+        // 로그인 시에는 탈퇴하지 않은(활동 중인) 회원만 조회
         return memberRepository
                 .findByProviderAndProviderId(provider, userInfo.getProviderId())
                 .map(member -> {
@@ -72,24 +73,50 @@ public class AuthService {
         SocialAuthClient client = socialAuthClientFactory.getClient(provider);
         SocialUserInfo userInfo = client.getUserInfo(request.getToken());
 
-        memberRepository.findByProviderAndProviderId(provider, userInfo.getProviderId())
-                .ifPresent(member -> {
-                    throw new SocialAuthenticationException("이미 가입된 회원입니다.");
-                });
+        // 탈퇴한 회원(is_deleted=true)까지 포함하여 조회
+        return memberRepository.findByProviderAndProviderIdWithDeleted(provider.name(), userInfo.getProviderId())
+                .map(member -> handleExistingMemberSignUp(member, request))
+                .orElseGet(() -> handleNewMemberSignUp(request, provider, userInfo.getProviderId()));
+    }
 
-        RelogMember member = RelogMember.builder()
+    private TokenResponse handleExistingMemberSignUp(RelogMember member, SocialSignUpRequest request) {
+        // 이미 활동 중인 회원이면 예외 발생
+        if (!member.isDeleted()) {
+            throw new SocialAuthenticationException("이미 가입된 회원입니다.");
+        }
+
+        // 탈퇴 회원 복구 및 정보 업데이트
+        restoreMember(member, request);
+        RelogMember savedMember = memberRepository.save(member);
+
+        return createTokenResponseWithMember(savedMember);
+    }
+
+    private TokenResponse handleNewMemberSignUp(SocialSignUpRequest request, SocialProvider provider, String providerId) {
+        RelogMember newMember = RelogMember.builder()
                 .provider(provider)
-                .providerId(userInfo.getProviderId())
+                .providerId(providerId)
                 .nickname(request.getNickname())
                 .birthday(request.getBirthday())
                 .build();
 
-        RelogMember savedMember = memberRepository.save(member);
-        TokenResponse tokens = createTokenResponse(savedMember.getId());
+        RelogMember savedMember = memberRepository.save(newMember);
+        return createTokenResponseWithMember(savedMember);
+    }
+
+    private void restoreMember(RelogMember member, SocialSignUpRequest request) {
+        member.setDeleted(false);
+        member.updateNickname(request.getNickname());
+        member.updateBirthday(request.getBirthday());
+        log.info("탈퇴한 회원 재가입 처리 (복구): memberId={}", member.getId());
+    }
+
+    private TokenResponse createTokenResponseWithMember(RelogMember member) {
+        TokenResponse tokens = createTokenResponse(member.getId());
         return TokenResponse.builder()
                 .accessToken(tokens.getAccessToken())
                 .refreshToken(tokens.getRefreshToken())
-                .member(MemberResponse.from(savedMember))
+                .member(MemberResponse.from(member))
                 .build();
     }
 
@@ -124,10 +151,13 @@ public class AuthService {
             revokeAppleToken(request.getAuthorizationCode());
         }
 
+        // 연관 데이터 삭제
         deleteProfileImage(member);
         giftRepository.deleteAll(giftRepository.findAllByMemberId(memberId));
         eventRepository.deleteAll(eventRepository.findAllByMemberId(memberId));
         friendRepository.deleteAll(friendRepository.findAllByMemberId(memberId));
+
+        // 회원 Soft Delete 처리 (@SQLDelete 작동)
         memberRepository.delete(member);
         tokenGenerator.invalidateRefreshToken(memberId);
     }

@@ -10,6 +10,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Slf4j
 @Service
@@ -32,9 +33,14 @@ public class AppleTokenRevokeService {
     }
 
     public void revokeToken(String authorizationCode) {
-        String clientSecret = secretGenerator.generate();
-        String refreshToken = exchangeCodeForRefreshToken(authorizationCode, clientSecret);
-        revokeRefreshToken(refreshToken, clientSecret);
+        try {
+            String clientSecret = secretGenerator.generate();
+            String refreshToken = exchangeCodeForRefreshToken(authorizationCode, clientSecret);
+            revokeRefreshToken(refreshToken, clientSecret);
+        } catch (WebClientResponseException e) {
+            log.error("[Apple] API 호출 실패. Status: {}, Body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new SocialAuthenticationException("Apple API 호출 실패: " + e.getResponseBodyAsString());
+        }
     }
 
     private String exchangeCodeForRefreshToken(String authorizationCode, String clientSecret) {
@@ -44,7 +50,7 @@ public class AppleTokenRevokeService {
         formData.add("code", authorizationCode);
         formData.add("grant_type", "authorization_code");
 
-        Map<String, Object> response = webClient.post()
+        Map response = webClient.post()
                 .uri(APPLE_TOKEN_URL)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(formData))
@@ -53,7 +59,7 @@ public class AppleTokenRevokeService {
                 .block();
 
         if (response == null || !response.containsKey("refresh_token")) {
-            throw new SocialAuthenticationException("Apple 토큰 교환에 실패했습니다.");
+            throw new SocialAuthenticationException("Apple 토큰 교환 실패: 응답에 refresh_token이 없습니다.");
         }
 
         return (String) response.get("refresh_token");
