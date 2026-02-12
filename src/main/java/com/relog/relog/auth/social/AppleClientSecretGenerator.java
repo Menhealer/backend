@@ -50,8 +50,6 @@ public class AppleClientSecretGenerator {
                 .signWith(privateKey, Jwts.SIG.ES256)
                 .compact();
 
-        System.out.println(">>> GENERATED_APPLE_CLIENT_SECRET: " + clientSecret);
-
         return clientSecret;
     }
 
