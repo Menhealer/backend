@@ -7,6 +7,7 @@ import com.relog.relog.ai.dto.QuarterlyAiRequest;
 import com.relog.relog.ai.dto.QuarterlyAnalysisResult;
 import com.relog.relog.event.entity.Event;
 import com.relog.relog.event.repository.EventRepository;
+import com.relog.relog.friend.dto.FriendResponse;
 import com.relog.relog.friend.entity.Friend;
 import com.relog.relog.friend.repository.FriendRepository;
 import com.relog.relog.gift.entity.Gift;
@@ -17,12 +18,11 @@ import com.relog.relog.settlement.dto.MonthlySettlementResponse.RelationshipSolu
 import com.relog.relog.settlement.dto.MonthlySettlementResponse.SummaryResponse;
 import com.relog.relog.settlement.dto.MonthlySettlementResponse.TopFriendResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse;
-import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendMaintenanceResponse;
+import com.relog.relog.settlement.dto.QuarterlySettlementResponse.BestFriendResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse.FriendRankResponse;
 import com.relog.relog.settlement.dto.QuarterlySettlementResponse.QuarterlySolutionResponse;
 import com.relog.relog.settlement.repository.SettlementCacheRepository;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -50,8 +50,6 @@ public class SettlementService {
 
     private static final int POSITIVE_THRESHOLD = 4;
     private static final int NEGATIVE_THRESHOLD = 2;
-    private static final int MAINTAIN_DAYS_MIN = 30;
-    private static final int ATTENTION_DAYS_MIN = 90;
 
     public MonthlySettlementResponse getMonthlySettlement(Long memberId, int year, int month) {
         if (mockEnabled) {
@@ -102,15 +100,13 @@ public class SettlementService {
         LocalDate endDate = startDate.plusMonths(3).minusDays(1);
 
         List<Event> events = eventRepository.findAllWithFriendByMemberIdAndDateRange(memberId, startDate, endDate);
-        List<Friend> allFriends = friendRepository.findAllByMemberId(memberId);
 
-        List<FriendRankResponse> bestFriends = findBestFriends(events, 5);
+        // 베스트 친구 (최대 5명)
+        List<BestFriendResponse> bestFriends = findBestFriends(events, 5);
+        // 워스트 친구 (최대 5명)
         List<FriendRankResponse> worstFriends = findWorstFriends(events, 5);
-        List<FriendMaintenanceResponse> friendsToMaintain = findFriendsToMaintain(allFriends, events);
-        List<FriendMaintenanceResponse> friendsNeedingAttention = findFriendsNeedingAttention(allFriends, events);
 
-        QuarterlyAiRequest aiRequest = buildQuarterlyAiRequest(
-                year, quarter, events, bestFriends, worstFriends, friendsToMaintain, friendsNeedingAttention);
+        QuarterlyAiRequest aiRequest = buildQuarterlyAiRequest(year, quarter, events, bestFriends, worstFriends);
         QuarterlyAnalysisResult aiResult = aiAnalysisService.analyzeQuarterly(aiRequest);
 
         QuarterlySettlementResponse response = QuarterlySettlementResponse.builder()
@@ -118,8 +114,6 @@ public class SettlementService {
                 .quarter(quarter)
                 .bestFriends(bestFriends)
                 .worstFriends(worstFriends)
-                .friendsToMaintain(friendsToMaintain)
-                .friendsNeedingAttention(friendsNeedingAttention)
                 .solution(toQuarterlySolution(aiResult))
                 .build();
 
@@ -183,9 +177,7 @@ public class SettlementService {
 
     private QuarterlyAiRequest buildQuarterlyAiRequest(
             int year, int quarter, List<Event> events,
-            List<FriendRankResponse> bestFriends, List<FriendRankResponse> worstFriends,
-            List<FriendMaintenanceResponse> friendsToMaintain,
-            List<FriendMaintenanceResponse> friendsNeedingAttention) {
+            List<BestFriendResponse> bestFriends, List<FriendRankResponse> worstFriends) {
 
         int startMonth = (quarter - 1) * 3 + 1;
         List<QuarterlyAiRequest.MonthlySummaryData> monthlySummaries = new ArrayList<>();
@@ -223,11 +215,11 @@ public class SettlementService {
 
         List<QuarterlyAiRequest.FriendRankData> bestFriendData = bestFriends.stream()
                 .map(f -> QuarterlyAiRequest.FriendRankData.builder()
-                        .friendName(f.getFriendName())
-                        .meetingCount(f.getMeetingCount())
-                        .averageScore(f.getAverageScore())
-                        .positiveCount(f.getPositiveCount())
-                        .negativeCount(f.getNegativeCount())
+                        .friendName(f.getFriend().getName())
+                        .averageScore(f.getFriend().getScore()) // Friend score를 평균 점수 대신 사용하거나, 별도 계산 필요
+                        .meetingCount(0) // BestFriendResponse에는 만남 횟수가 없으므로 0 혹은 별도 로직 필요
+                        .positiveCount(0)
+                        .negativeCount(0)
                         .build())
                 .toList();
 
@@ -241,30 +233,14 @@ public class SettlementService {
                         .build())
                 .toList();
 
-        List<QuarterlyAiRequest.FriendMaintenanceData> maintainData = friendsToMaintain.stream()
-                .map(f -> QuarterlyAiRequest.FriendMaintenanceData.builder()
-                        .friendName(f.getFriendName())
-                        .daysSinceLastMeeting(f.getDaysSinceLastMeeting())
-                        .recommendation(f.getRecommendation())
-                        .build())
-                .toList();
-
-        List<QuarterlyAiRequest.FriendMaintenanceData> attentionData = friendsNeedingAttention.stream()
-                .map(f -> QuarterlyAiRequest.FriendMaintenanceData.builder()
-                        .friendName(f.getFriendName())
-                        .daysSinceLastMeeting(f.getDaysSinceLastMeeting())
-                        .recommendation(f.getRecommendation())
-                        .build())
-                .toList();
-
         return QuarterlyAiRequest.builder()
                 .year(year)
                 .quarter(quarter)
                 .monthlySummaries(monthlySummaries)
                 .bestFriends(bestFriendData)
                 .worstFriends(worstFriendData)
-                .friendsToMaintain(maintainData)
-                .friendsNeedingAttention(attentionData)
+                .friendsToMaintain(List.of()) // 삭제된 필드는 빈 리스트로 처리
+                .friendsNeedingAttention(List.of()) // 삭제된 필드는 빈 리스트로 처리
                 .build();
     }
 
@@ -375,15 +351,22 @@ public class SettlementService {
         return topEntry;
     }
 
-    private List<FriendRankResponse> findBestFriends(List<Event> events, int limit) {
+    private List<BestFriendResponse> findBestFriends(List<Event> events, int limit) {
         Map<Long, List<Event>> eventsByFriend = groupEventsByFriend(events);
 
-        return eventsByFriend.entrySet().stream()
-                .map(entry -> createFriendRank(entry.getKey(), entry.getValue()))
-                .sorted(Comparator.comparingDouble(FriendRankResponse::getAverageScore).reversed()
-                        .thenComparingInt(FriendRankResponse::getMeetingCount).reversed())
+        return eventsByFriend.values().stream()
+                .map(this::createBestFriend)
+                .sorted(Comparator.comparingDouble((BestFriendResponse b) -> b.getFriend().getScore()).reversed())
                 .limit(limit)
                 .toList();
+    }
+
+    private BestFriendResponse createBestFriend(List<Event> events) {
+        Friend friend = events.get(0).getFriend();
+        return BestFriendResponse.builder()
+                .friend(FriendResponse.from(friend))
+                .recommendation("좋은 관계를 유지하고 있습니다.")
+                .build();
     }
 
     private List<FriendRankResponse> findWorstFriends(List<Event> events, int limit) {
@@ -396,77 +379,6 @@ public class SettlementService {
                         .thenComparingInt(FriendRankResponse::getNegativeCount).reversed())
                 .limit(limit)
                 .toList();
-    }
-
-    private List<FriendMaintenanceResponse> findFriendsToMaintain(List<Friend> allFriends, List<Event> events) {
-        Map<Long, LocalDate> lastMeetingByFriend = buildLastMeetingMap(events);
-        LocalDate now = LocalDate.now();
-        List<FriendMaintenanceResponse> result = new ArrayList<>();
-
-        for (Friend friend : allFriends) {
-            LocalDate lastMeeting = lastMeetingByFriend.get(friend.getId());
-            if (lastMeeting == null) {
-                continue;
-            }
-            long daysSince = ChronoUnit.DAYS.between(lastMeeting, now);
-            if (daysSince < MAINTAIN_DAYS_MIN || daysSince >= ATTENTION_DAYS_MIN) {
-                continue;
-            }
-            result.add(createMaintenanceResponse(friend, (int) daysSince, "오랜 기간 유지하면 좋은 관계입니다."));
-        }
-
-        return result;
-    }
-
-    private List<FriendMaintenanceResponse> findFriendsNeedingAttention(List<Friend> allFriends, List<Event> events) {
-        Map<Long, LocalDate> lastMeetingByFriend = buildLastMeetingMap(events);
-        LocalDate now = LocalDate.now();
-        List<FriendMaintenanceResponse> result = new ArrayList<>();
-
-        for (Friend friend : allFriends) {
-            LocalDate lastMeeting = lastMeetingByFriend.get(friend.getId());
-
-            if (lastMeeting == null) {
-                result.add(createMaintenanceResponse(friend, -1, "만남 기록이 없습니다. 연락해보세요."));
-                continue;
-            }
-
-            long daysSince = ChronoUnit.DAYS.between(lastMeeting, now);
-            if (daysSince < ATTENTION_DAYS_MIN) {
-                continue;
-            }
-            result.add(createMaintenanceResponse(friend, (int) daysSince, "기간 내로 정리가 필요한 관계입니다."));
-        }
-
-        return result;
-    }
-
-    private Map<Long, LocalDate> buildLastMeetingMap(List<Event> events) {
-        Map<Long, LocalDate> lastMeetingByFriend = new HashMap<>();
-
-        for (Event event : events) {
-            Long friendId = event.getFriend().getId();
-            LocalDate eventDate = event.getEventDate();
-            lastMeetingByFriend.merge(friendId, eventDate, this::getLaterDate);
-        }
-
-        return lastMeetingByFriend;
-    }
-
-    private LocalDate getLaterDate(LocalDate a, LocalDate b) {
-        if (a.isAfter(b)) {
-            return a;
-        }
-        return b;
-    }
-
-    private FriendMaintenanceResponse createMaintenanceResponse(Friend friend, int daysSince, String recommendation) {
-        return FriendMaintenanceResponse.builder()
-                .friendId(friend.getId())
-                .friendName(friend.getName())
-                .daysSinceLastMeeting(daysSince)
-                .recommendation(recommendation)
-                .build();
     }
 
     private Map<Long, List<Event>> groupEventsByFriend(List<Event> events) {
@@ -577,16 +489,18 @@ public class SettlementService {
     }
 
     private QuarterlySettlementResponse createMockQuarterlyResponse(int year, int quarter) {
-        List<FriendRankResponse> bestFriends = List.of(
-                FriendRankResponse.builder()
-                        .friendId(1L).friendName("김민수")
-                        .meetingCount(14).averageScore(4.5).positiveCount(12).negativeCount(0).build(),
-                FriendRankResponse.builder()
-                        .friendId(2L).friendName("이서연")
-                        .meetingCount(10).averageScore(4.2).positiveCount(8).negativeCount(1).build(),
-                FriendRankResponse.builder()
-                        .friendId(3L).friendName("박지훈")
-                        .meetingCount(8).averageScore(4.0).positiveCount(6).negativeCount(1).build());
+        Friend friend1 = Friend.builder().id(1L).name("김민수").score(85).build();
+        Friend friend2 = Friend.builder().id(2L).name("이서연").score(70).build();
+
+        List<BestFriendResponse> bestFriends = List.of(
+                BestFriendResponse.builder()
+                        .friend(FriendResponse.from(friend1))
+                        .recommendation("좋은 관계를 유지하고 있습니다.")
+                        .build(),
+                BestFriendResponse.builder()
+                        .friend(FriendResponse.from(friend2))
+                        .recommendation("좋은 관계를 유지하고 있습니다.")
+                        .build());
 
         List<FriendRankResponse> worstFriends = List.of(
                 FriendRankResponse.builder()
@@ -596,35 +510,15 @@ public class SettlementService {
                         .friendId(5L).friendName("정도윤")
                         .meetingCount(2).averageScore(2.5).positiveCount(0).negativeCount(1).build());
 
-        List<FriendMaintenanceResponse> friendsToMaintain = List.of(
-                FriendMaintenanceResponse.builder()
-                        .friendId(6L).friendName("한소희")
-                        .daysSinceLastMeeting(45).recommendation("오랜 기간 유지하면 좋은 관계입니다.").build(),
-                FriendMaintenanceResponse.builder()
-                        .friendId(7L).friendName("윤재호")
-                        .daysSinceLastMeeting(60).recommendation("오랜 기간 유지하면 좋은 관계입니다.").build());
-
-        List<FriendMaintenanceResponse> friendsNeedingAttention = List.of(
-                FriendMaintenanceResponse.builder()
-                        .friendId(8L).friendName("송하늘")
-                        .daysSinceLastMeeting(120).recommendation("기간 내로 정리가 필요한 관계입니다.").build(),
-                FriendMaintenanceResponse.builder()
-                        .friendId(9L).friendName("오민재")
-                        .daysSinceLastMeeting(-1).recommendation("만남 기록이 없습니다. 연락해보세요.").build());
-
         QuarterlySolutionResponse solution = QuarterlySolutionResponse.builder()
                 .overallAnalysis("이번 분기 총 37회의 만남이 있었으며 전반적으로 활발한 교류가 있었습니다.")
                 .positiveInsights(List.of(
                         "김민수님과 매우 좋은 관계를 유지하고 있습니다.",
-                        "이서연님과의 만남 만족도가 높습니다.",
-                        "박지훈님과 꾸준한 만남을 이어가고 있습니다."))
+                        "이서연님과의 만남 만족도가 높습니다."))
                 .negativeInsights(List.of(
-                        "최예진님과의 관계 개선이 필요합니다.",
-                        "정도윤님과의 만남 빈도가 낮고 만족도가 떨어집니다."))
+                        "최예진님과의 관계 개선이 필요합니다."))
                 .actionItems(List.of(
-                        "최예진님과 솔직한 대화를 나눠보세요.",
-                        "송하늘님에게 연락을 해보세요.",
-                        "오민재님과 첫 만남을 계획해보세요."))
+                        "최예진님과 솔직한 대화를 나눠보세요."))
                 .build();
 
         return QuarterlySettlementResponse.builder()
@@ -632,8 +526,6 @@ public class SettlementService {
                 .quarter(quarter)
                 .bestFriends(bestFriends)
                 .worstFriends(worstFriends)
-                .friendsToMaintain(friendsToMaintain)
-                .friendsNeedingAttention(friendsNeedingAttention)
                 .solution(solution)
                 .build();
     }

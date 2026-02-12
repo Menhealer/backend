@@ -1,5 +1,6 @@
 package com.relog.relog.settlement.dto;
 
+import com.relog.relog.friend.dto.FriendResponse;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,11 +13,17 @@ public class QuarterlySettlementResponse {
 
     private int year;
     private int quarter;
-    private List<FriendRankResponse> bestFriends;
+    private List<BestFriendResponse> bestFriends;
     private List<FriendRankResponse> worstFriends;
-    private List<FriendMaintenanceResponse> friendsToMaintain;
-    private List<FriendMaintenanceResponse> friendsNeedingAttention;
     private QuarterlySolutionResponse solution;
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class BestFriendResponse {
+        private FriendResponse friend;
+        private String recommendation;
+    }
 
     @Getter
     @AllArgsConstructor
@@ -28,16 +35,6 @@ public class QuarterlySettlementResponse {
         private double averageScore;
         private int positiveCount;
         private int negativeCount;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    @Builder
-    public static class FriendMaintenanceResponse {
-        private Long friendId;
-        private String friendName;
-        private int daysSinceLastMeeting;
-        private String recommendation;
     }
 
     @Getter
