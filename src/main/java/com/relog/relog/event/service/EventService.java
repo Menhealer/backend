@@ -173,7 +173,7 @@ public class EventService {
             return;
         }
         birthdays.add(FriendResponse.builder()
-                .id(null)
+                .id(member.getId())
                 .name(member.getNickname())
                 .birthday(member.getBirthday())
                 .group(null)
