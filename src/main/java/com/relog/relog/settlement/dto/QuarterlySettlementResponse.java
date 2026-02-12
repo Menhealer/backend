@@ -13,28 +13,16 @@ public class QuarterlySettlementResponse {
 
     private int year;
     private int quarter;
-    private List<BestFriendResponse> bestFriends;
-    private List<FriendRankResponse> worstFriends;
+    private List<AnalyzedFriendResponse> bestFriends;
+    private List<AnalyzedFriendResponse> worstFriends;
     private QuarterlySolutionResponse solution;
 
     @Getter
     @AllArgsConstructor
     @Builder
-    public static class BestFriendResponse {
+    public static class AnalyzedFriendResponse {
         private FriendResponse friend;
         private String recommendation;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    @Builder
-    public static class FriendRankResponse {
-        private Long friendId;
-        private String friendName;
-        private int meetingCount;
-        private double averageScore;
-        private int positiveCount;
-        private int negativeCount;
     }
 
     @Getter
