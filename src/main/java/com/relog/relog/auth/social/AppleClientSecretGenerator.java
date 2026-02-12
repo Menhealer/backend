@@ -36,7 +36,7 @@ public class AppleClientSecretGenerator {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + EXPIRATION_MS);
 
-        return Jwts.builder()
+        String clientSecret = Jwts.builder()
                 .header()
                 .keyId(keyId)
                 .and()
@@ -49,6 +49,10 @@ public class AppleClientSecretGenerator {
                 .subject(clientId)
                 .signWith(privateKey, Jwts.SIG.ES256)
                 .compact();
+
+        System.out.println(">>> GENERATED_APPLE_CLIENT_SECRET: " + clientSecret);
+
+        return clientSecret;
     }
 
     private PrivateKey parsePrivateKey() {
