@@ -45,6 +45,9 @@ dependencies {
 
     implementation 'com.oracle.oci.sdk:oci-java-sdk-objectstorage:3.80.0'
     implementation 'com.oracle.oci.sdk:oci-java-sdk-common-httpclient-jersey3:3.80.0'
+
+    implementation 'com.auth0:java-jwt:4.4.0'
+    implementation 'com.auth0:jwks-rsa:0.22.1'
     
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

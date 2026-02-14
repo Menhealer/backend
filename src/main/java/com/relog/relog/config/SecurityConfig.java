@@ -1,5 +1,6 @@
 package com.relog.relog.config;
 
+import com.relog.relog.jwt.AppCheckFilter;
 import com.relog.relog.jwt.JwtAuthenticationEntryPoint;
 import com.relog.relog.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final SecurityProperties securityProperties;
+    private final AppCheckFilter appCheckFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -33,6 +35,7 @@ public class SecurityConfig {
                         .requestMatchers(securityProperties.getPermitPaths().toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(appCheckFilter, JwtAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
