@@ -8,7 +8,7 @@
     <springProperty name="DISCORD_WEBHOOK_URL" source="discord.webhook-url" defaultValue=""/>
 
     <!-- Discord Webhook Appender (webhookUrl이 비어있으면 자동 무시) -->
-    <appender name="DISCORD" class="com.example.common.logging.DiscordWebhookAppender">
+    <appender name="DISCORD" class="com.relog.relog.common.logging.DiscordWebhookAppender">
         <webhookUrl>${DISCORD_WEBHOOK_URL}</webhookUrl>
         <applicationName>${spring.application.name:-MyApp}</applicationName>
         <environment>${SPRING_PROFILES_ACTIVE:-local}</environment>
