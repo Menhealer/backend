@@ -1,4 +1,4 @@
-package com.example.common.logging;
+package com.relog.relog.common.logging;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
