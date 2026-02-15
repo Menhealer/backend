@@ -4,9 +4,11 @@ import com.relog.relog.auth.dto.SocialUserInfo;
 import com.relog.relog.auth.exception.SocialAuthenticationException;
 import com.relog.relog.member.entity.SocialProvider;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+@Slf4j
 @Component
 public class KakaoAuthClient implements SocialAuthClient {
 
@@ -54,6 +56,7 @@ public class KakaoAuthClient implements SocialAuthClient {
         } catch (SocialAuthenticationException e) {
             throw e;
         } catch (Exception e) {
+            log.error("[Kakao] 소셜 로그인 실패 - {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
             throw new SocialAuthenticationException("카카오 인증에 실패했습니다.");
         }
     }

@@ -5,6 +5,7 @@ import com.relog.relog.auth.exception.SocialAuthenticationException;
 import com.relog.relog.member.entity.SocialProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import lombok.extern.slf4j.Slf4j;
 import java.math.BigInteger;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+@Slf4j
 @Component
 public class AppleAuthClient implements SocialAuthClient {
 
@@ -59,6 +61,7 @@ public class AppleAuthClient implements SocialAuthClient {
         } catch (SocialAuthenticationException e) {
             throw e;
         } catch (Exception e) {
+            log.error("[Apple] 소셜 로그인 실패 - {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
             throw new SocialAuthenticationException("애플 인증에 실패했습니다.");
         }
     }
