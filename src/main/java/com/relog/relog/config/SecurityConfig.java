@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -37,7 +38,7 @@ public class SecurityConfig {
                         .requestMatchers(securityProperties.getPermitPaths().toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(requestLoggingFilter, AppCheckFilter.class)
+                .addFilterBefore(requestLoggingFilter, SecurityContextHolderFilter.class)
                 .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
