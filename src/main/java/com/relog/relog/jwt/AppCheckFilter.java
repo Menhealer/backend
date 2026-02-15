@@ -77,13 +77,9 @@ public class AppCheckFilter extends OncePerRequestFilter {
     private void verifyToken(String token) throws Exception {
         DecodedJWT jwt = JWT.decode(token);
 
-        String projectNumber = appCheckProperties.getProjectNumber();
-        log.debug("App Check token iss: [{}], expected iss: [https://firebaseappcheck.googleapis.com/{}]",
-                jwt.getIssuer(), projectNumber);
-        log.debug("App Check projectNumber length: {}, chars: {}",
-                projectNumber.length(), projectNumber.chars().mapToObj(c -> String.format("%d", c)).toList());
-
         RSAPublicKey publicKey = (RSAPublicKey) jwkProvider.get(jwt.getKeyId()).getPublicKey();
+
+        String projectNumber = appCheckProperties.getProjectNumber();
 
         JWTVerifier verifier = JWT.require(Algorithm.RSA256(publicKey, null))
                 .withIssuer("https://firebaseappcheck.googleapis.com/" + projectNumber)
