@@ -77,6 +77,8 @@ public class AppCheckFilter extends OncePerRequestFilter {
     private void verifyToken(String token) throws Exception {
         DecodedJWT jwt = JWT.decode(token);
 
+        log.debug("App Check token iss: {}, aud: {}", jwt.getIssuer(), jwt.getAudience());
+
         RSAPublicKey publicKey = (RSAPublicKey) jwkProvider.get(jwt.getKeyId()).getPublicKey();
 
         String projectNumber = appCheckProperties.getProjectNumber();
