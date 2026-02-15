@@ -35,7 +35,7 @@ public class SecurityConfig {
                         .requestMatchers(securityProperties.getPermitPaths().toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(appCheckFilter, JwtAuthenticationFilter.class)
+                .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
