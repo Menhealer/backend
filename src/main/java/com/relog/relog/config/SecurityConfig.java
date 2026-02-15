@@ -3,6 +3,7 @@ package com.relog.relog.config;
 import com.relog.relog.jwt.AppCheckFilter;
 import com.relog.relog.jwt.JwtAuthenticationEntryPoint;
 import com.relog.relog.jwt.JwtAuthenticationFilter;
+import com.relog.relog.jwt.RequestLoggingFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final SecurityProperties securityProperties;
     private final AppCheckFilter appCheckFilter;
+    private final RequestLoggingFilter requestLoggingFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -35,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(securityProperties.getPermitPaths().toArray(String[]::new)).permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(requestLoggingFilter, AppCheckFilter.class)
                 .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
