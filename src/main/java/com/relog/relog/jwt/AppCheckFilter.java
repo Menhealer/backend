@@ -9,6 +9,7 @@ import com.auth0.jwt.interfaces.JWTVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.relog.relog.common.ApiResponse;
 import com.relog.relog.config.FirebaseAppCheckProperties;
+import com.relog.relog.config.SecurityProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,6 +32,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class AppCheckFilter extends OncePerRequestFilter {
 
     private final FirebaseAppCheckProperties appCheckProperties;
+    private final SecurityProperties securityProperties;
     private final ObjectMapper objectMapper;
 
     private static final String APP_CHECK_HEADER = "X-Firebase-AppCheck";
@@ -50,7 +52,12 @@ public class AppCheckFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !appCheckProperties.isEnabled();
+        if (!appCheckProperties.isEnabled()) {
+            return true;
+        }
+        String path = request.getRequestURI();
+        return securityProperties.getPermitPaths().stream()
+                .anyMatch(path::startsWith);
     }
 
     @Override
