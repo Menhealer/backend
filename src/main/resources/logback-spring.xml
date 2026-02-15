@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 기본 콘솔 출력 -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- application.yml에서 Spring 프로퍼티 가져오기 -->
+    <springProperty name="DISCORD_WEBHOOK_URL" source="discord.webhook-url" defaultValue=""/>
+
+    <!-- Discord Webhook Appender (webhookUrl이 비어있으면 자동 무시) -->
+    <appender name="DISCORD" class="com.example.common.logging.DiscordWebhookAppender">
+        <webhookUrl>${DISCORD_WEBHOOK_URL}</webhookUrl>
+        <applicationName>${spring.application.name:-MyApp}</applicationName>
+        <environment>${SPRING_PROFILES_ACTIVE:-local}</environment>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="DISCORD"/>
+    </root>
+</configuration>
